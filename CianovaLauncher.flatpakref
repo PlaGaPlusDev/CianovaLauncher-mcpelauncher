@@ -1,6 +1,0 @@
-[Flatpak Ref]
-Name=org.cianova.Launcher
-Branch=master
-Url=https://plagaplusdev.github.io/CianovaLauncher-mcpelauncher/repo
-SuggestRemoteName=cianova
-IsRuntime=false
