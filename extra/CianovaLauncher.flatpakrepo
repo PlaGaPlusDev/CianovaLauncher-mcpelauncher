@@ -1,0 +1,5 @@
+[Flatpak Repo]
+Title=Cianova Launcher
+Url=https://plagaplusdev.github.io/CianovaLauncher-mcpelauncher/repo
+GPGKey=https://plagaplusdev.github.io/CianovaLauncher-mcpelauncher/cianova.asc
+Nodelete=true
