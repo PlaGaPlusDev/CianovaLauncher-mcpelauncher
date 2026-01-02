@@ -1,2 +1,0 @@
-repo/objects/*/*.filez filter=lfs diff=lfs merge=lfs -text
-repo/objects/*/*.delta filter=lfs diff=lfs merge=lfs -text
