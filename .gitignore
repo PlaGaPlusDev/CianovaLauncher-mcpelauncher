@@ -2,3 +2,11 @@ __pycache__
 dist
 build
 venv
+.flatpak-builder
+bin/mcpelauncher-client
+bin/mcpelauncher-extract
+bin/mcpelauncher-webview
+bin/mcpelauncher-error
+BIN-PACKS
+build-dir
+repo

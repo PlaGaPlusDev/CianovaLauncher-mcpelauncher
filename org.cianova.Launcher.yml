@@ -1,0 +1,139 @@
+app-id: org.cianova.Launcher
+runtime: org.kde.Platform
+runtime-version: "5.15-23.08"
+sdk: org.kde.Sdk
+base: io.qt.qtwebengine.BaseApp
+base-version: "5.15-23.08"
+command: cianova-launcher.sh
+
+metadata:
+  x-flatpak-version: "2.0.0"
+
+build-options:
+  strip: false
+  no-debug-source: true
+  build-args:
+    - --share=network
+
+finish-args:
+  # Acceso a X11 y Wayland para GUI
+  - --socket=x11
+  - --socket=wayland
+  - --share=ipc
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.freedesktop.portal.Config
+  - --env=GTK_THEME=Adwaita-dark
+  - --metadata=X-DCONF=true
+  - --env=XDG_CURRENT_DESKTOP=KDE
+  # Variables de entorno para forzar modo oscuro en la aplicación
+  - --env=QT_QPA_PLATFORMTHEME=kde
+  - --env=QT_STYLE_OVERRIDE=kvantum
+  - --env=COLOR_SCHEME=dark
+
+  # Acceso a GPU para OpenGL
+  - --device=dri
+
+  # Acceso a red para descargas
+  - --share=network
+
+  # Acceso al sistema de archivos home para guardar datos
+  - --filesystem=home
+  # Acceso explícito a datos locales para migración (Flatpak suele ocultar .local)
+  - --filesystem=~/.local/share/mcpelauncher
+  # Acceso explícito a datos flatpak para migración (Flatpak Custom .var)
+  - --filesystem=~/.var/app
+
+  # Acceso a PulseAudio para sonido
+  - --socket=pulseaudio
+
+  # Permitir ejecución de binarios empaquetados
+  - --talk-name=org.freedesktop.Flatpak
+
+  # Acceso para leer /.flatpak-info (detección de contexto)
+  - --filesystem=/.flatpak-info:ro
+
+  # Persistir datos entre actualizaciones
+  - --persist=.mcpelauncher
+
+  # Soporte para los mandos y dispositivos a bajo nivel
+  - --device=all
+
+  # Variables de entorno necesarias
+  - --env=PATH=/app/bin:/usr/bin
+  - --env=LD_LIBRARY_PATH=/app/lib
+
+# Permitir acceso a red durante el build para pip
+
+modules:
+  - name: libevdev
+    buildsystem: autotools
+    sources:
+      - type: archive
+        path: flatlibs/libevdev-1.13.1.tar.xz
+
+  - name: libzip
+    buildsystem: cmake-ninja
+    build-options:
+      - make-args: -j$(nproc)
+    sources:
+      - type: archive
+        path: flatlibs/libzip-1.9.2.tar.gz
+
+  # Módulo principal del launcher con dependencias Python
+  - name: cianova-launcher
+    buildsystem: simple
+    build-commands:
+      # Crear directorio para el launcher
+      - mkdir -p /app/lib/cianova
+      - cp -r dist/CianovaLauncherMCPE/* /app/lib/cianova
+      - install -Dm755 cianova-launcher.sh /app/bin/cianova-launcher.sh
+
+      # Copiar binarios de mcpelauncher al directorio bin/
+      - mkdir -p /app/bin
+      - cp -r bin/* /app/bin/ || true
+      - chmod +x /app/bin/* || true
+
+      # Copiar icono
+      - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/org.cianova.Launcher.png
+
+      # Crear archivo .desktop
+      - |
+        cat > org.cianova.Launcher.desktop << EOF
+        [Desktop Entry]
+        Name=Cianova Launcher
+        Comment=Launcher para Minecraft Bedrock en Linux
+        Exec=cianova-launcher.sh
+        Icon=org.cianova.Launcher
+        Type=Application
+        Categories=Game;Utility;
+        Terminal=false
+        EOF
+      - install -Dm644 org.cianova.Launcher.desktop /app/share/applications/org.cianova.Launcher.desktop
+      # Crear archivo de metadatos AppStream
+      - |
+        cat > org.cianova.Launcher.metainfo.xml << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <component type="desktop-application">
+          <id>org.cianova.Launcher</id>
+          <name>Cianova Launcher</name>
+          <summary>Launcher para Minecraft Bedrock Edition en Linux</summary>
+          <metadata_license>CC0-1.0</metadata_license>
+          <project_license>GPL-3.0-or-later</project_license>
+          <description>
+            <p>
+              CianovaLauncher es un lanzador gráfico para Minecraft Bedrock Edition en Linux,
+              basado en mcpelauncher. Permite gestionar versiones, instalar APKs, y configurar
+              el entorno de juego de manera sencilla.
+            </p>
+          </description>
+          <launchable type="desktop-id">org.cianova.Launcher.desktop</launchable>
+          <provides>
+            <binary>cianova-launcher.sh</binary>
+          </provides>
+        </component>
+        EOF
+      - install -Dm644 org.cianova.Launcher.metainfo.xml /app/share/metainfo/org.cianova.Launcher.metainfo.xml
+
+    sources:
+      - type: dir
+        path: .

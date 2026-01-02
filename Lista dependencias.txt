@@ -1,0 +1,70 @@
+Lista de requisitos:
+APT:
+sudo apt install \
+    libcurl4 \
+    libssl3 \
+    libx11-6 \
+    libxext6 \
+    libxi6 \
+    libxrandr2 \
+    libxcursor1 \
+    libxfixes3 \
+    libxrender1 \
+    libasound2 \
+    libpulse0 \
+    libsystemd0 \
+    libgl1 \
+    libegl1 \
+    libqt5core5a \
+    libqt5gui5 \
+    libqt5widgets5 \
+    libqt5network5 \
+    libqt5webengine5 \
+    libqt5qml5 \
+    libqt5quick5 \
+    libqt5svg5
+
+(Si "libasound2" falla en la instalación usar "libasound2t64")
+
+DNF:
+sudo dnf install \
+    libcurl \
+    openssl-libs \
+    libX11 \
+    libXext \
+    libXi \
+    libXrandr \
+    libXcursor \
+    libXfixes \
+    libXrender \
+    alsa-lib \
+    pulseaudio-libs \
+    systemd-libs \
+    mesa-libGL \
+    mesa-libEGL \
+    qt5-qtbase \
+    qt5-qtwebengine \
+    qt5-qtdeclarative \
+    qt5-qtsvg \
+    qt5-qtquickcontrols2
+
+PACMAN:
+sudo pacman -Sy --needed \
+    curl \
+    openssl \
+    libx11 \
+    libxext \
+    libxi \
+    libxrandr \
+    libxcursor \
+    libxfixes \
+    libxrender \
+    alsa-lib \
+    pulseaudio \
+    systemd-libs \
+    mesa \
+    qt5-base \
+    qt5-webengine \
+    qt5-declarative \
+    qt5-svg \
+    qt5-quickcontrols2

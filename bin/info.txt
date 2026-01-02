@@ -1,0 +1,9 @@
+==========================
+VERSION: 1.5.5 (Oficial) [30/Dic/2025] + Patch_v1 (PlaGaDev)
+==========================
+COMPILED WITH USING CMAKE:
+`cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release .. && make`
+==========================
+DO YOU WANT TO COMPILE YOUR OWN BINARIES?
+LINK TO MY FORK: https://github.com/PlaGaPlusDev/mcpelauncher-manifest-FIX
+LINK TO OFFICIAL PROJECT: https://github.com/minecraft-linux/mcpelauncher-manifest
