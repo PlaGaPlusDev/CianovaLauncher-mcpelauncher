@@ -20,7 +20,6 @@ Esta herramienta **NO** es un launcher independiente. Funciona como un complemen
 
 ## 3. Uso No Lucrativo
 Este software se distribuye de forma **GRATUITA**.
-*   Queda estrictamente prohibida su venta, alquiler o distribución comercial.
 *   Cualquier intento de monetizar esta herramienta viola los principios éticos bajo los cuales fue creada.
 
 ## 4. Exención de Responsabilidad
