@@ -1,0 +1,8 @@
+# Usar LFS para objetos binarios grandes
+repo/objects/[0-9a-f][0-9a-f]/* filter=lfs diff=lfs merge=lfs -text
+# Archivos pequeños - NO usar LFS
+repo/config filter= diff= merge= text
+repo/summary filter= diff= merge= text
+*.flatpakref filter= diff= merge= text
+*.html filter= diff= merge= text
+repo/objects/** filter=lfs diff=lfs merge=lfs -text
