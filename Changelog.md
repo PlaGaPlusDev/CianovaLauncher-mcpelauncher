@@ -1,5 +1,20 @@
-# 📝 Changelog - MCPETool
+# 📝 Changelog - CianovaLauncher
 
+# [v2.0] - 2026-01-02
+### ✨Novedades:
+- **Nombre nuevo:** Ahora pasara de MCPETool a la naturaleza de un launcher llamado **CianovaLauncher**
+- **Nuevas herramientas:** Migración, Acceso directo en el menú de inicio
+- Añadidos en Sección Ajustes y Acerca de
+- Independencia para usar binarios personalizados
+- Icono nuevo para el launcher
+- Detectar Flatpak (Custom)
+
+Para mas información de las herramientas consulte el ***Manual.***
+
+### ⚙️ Mejoras Técnicas
+- Mejoras en verificador de dependencias.
+- Mejoras en la calidad de la GUI.
+- Capacidad de guardar configuraciones.
 ## [v1.1.0] - 2025-12-03
 ### ✨ Novedades
 *   **Interfaz Rediseñada:** Nuevo look minimalista con bordes redondeados y mejor espaciado.
