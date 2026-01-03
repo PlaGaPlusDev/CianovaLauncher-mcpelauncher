@@ -11,24 +11,78 @@ CianovaLauncher es una interfaz gráfica moderna diseñada para facilitar la ges
 
 ## 🚀 Primeros Pasos
 
-### 1. Ejecución
-Para iniciar la herramienta, simplemente haz doble clic en el ejecutable `CianovaLauncher` o ejecútalo desde la terminal:
+### 1. Instalación y Ejecución
+#### Opción A - Ejecución de una versión compilada
+Descarga de la ultima **RELEASE** el archivo `CianovaLauncher-vX.Y.tar.gz` donde `X.Y.Z` es el numero de la versión y lo extraes en alguna carpeta que desees y también compila o descarga algún paquete de binarios del **MCPELAUNCHER-MANIFEST** del proyecto oficial; o algún algún pack Pre-compilado disponible de confianza llamado `BIN X.Y.Z (DATE) + <NOTES>.tar.gz` que vas a extraer y te dejara una carpeta llamada `bin` que la colocaras dentro de la carpeta raíz del launcher (Recomendado) o donde mejor te parezca.
+
+Para iniciar el launcher, simplemente haz doble clic en el ejecutable `CianovaLauncher` o ejecútalo desde la terminal:
+
 ```bash
 ./CianovaLauncher
 ```
 
-#### Ejecución para Flatpak
-Opcion A) Instalar y recibir actualizaciones desde `CianovaLauncher.flatpakref` para que lo descargues desde tu gestor de software. (Esto descarga automaticamente las ultimas actualizaciones y runtimes necesarios)
+Luego ve a Ajustes y completa la configuración de binarios y guarda la config.
+#### Opción B - Instalación para Flatpak
+##### Metodo 1 (Recomendado) - Actualizaciones
 
-Opcion B) Instalar desde el `CianovaLauncher.flatpak` mas reciente publicado en el github e instalar los runtimes necesarios en una terminal:
+Descarga el archivo `CianovaLauncher.flatpakrepo` en **RELEASE** o **EXTRA** para instalar y recibir actualizaciones desde tu gestor de software. (Esto descarga automáticamente las ultimas actualizaciones y runtimes necesarios).
+
+O añade manualmente con:
+- Añade el repositorio
+```bash
+flatpak remote-add --user --if-not-exists CianovaLauncher https://plagaplusdev.github.io/CianovaLauncher-mcpelauncher/CianovaLauncher.flatpakrepo
+```
+
+- Instalar el Launcher :
+```bash
+flatpak install --user CianovaLauncher org.cianova.Launcher
+```
+
+Esto hará que se instale el launcher con sus runtimes necesarios, pero puedes instalarlos manualmente con:
+
+```bash
+flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
+```
+##### Metodo 2 - Bundle
+
+ Descarga e instala `CianovaLauncher.flatpak` en **RELEASE** publicado en el GitHub oficial del launcher y ábrelo con algún **gestor de software** que tengas o usando el comando:
+
+```bash
+flatpak install --user CianovaLauncher.flatpak
+```
+*(NOTA: El nombre del archivo también puede incluir el numero de la versión).*
+
+Eh instala los runtimes necesarios con:
 ```bash
 flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
 ```
 
-Opcion C) Compila mediante PyInstaller usando `./build.sh` y luego ejecuta `./build-flatpak.sh` que va a descargar los runtimes necesarios y automatizara la instalacion en tu sistema como --user.
+#### Metodo 3 - Compilado local
 
-Para saber mas vaya a [MANUAL DE USO](MANUAL%DE%USO.md).
+Descarga un pack de binarios precompilados y colocandolos en la carpeta `bin` y compila mediante PyInstaller usando `./build.sh` y luego ejecuta `./build-flatpak.sh` y se van a descargar los runtimes necesarios y automatizara la instalación en tu sistema como `--user`.
 
+*(NOTA: Adicional se usara `org.kde.Sdk//5.15-23.08` para el empaquetado).*
+
+### Opcion C - Ejecutar de source code
+
+Clona el repositorio e instala con `pip` las librerías `Pillow` y `customtkinter` en tu sistema o un entorno virtual y luego ejecuta con `run.sh` para ejecutar desde el archivo `.py`
+
+## PostInstalación ⚙️
+
+**NO FLATPAK VER:** 
+	- Verifica tus requisitos en la herramienta `Verificador de requisitos` para ver el rango de versiones compatibles aproximados y `Verificador de dependencias` para tener las ultimas librerías necesarias dependiendo de tu Distro.
+	- Ve a ajustes y guarda la configuración de los binarios tal y como hayas descargado `mcpelauncher-client, extractor, webview, error`
+
+**FLATPAK VER:**
+	- Verifica que tengas los runtimes instalados explicados arriba
+	- Ajusta y guarda los binarios que vayas a usar (Por defecto en Sistema "Propio").
+
+**AMBOS:**
+	- Instala una APK conseguida por sus propios medios en la herramienta `Instalación de APK`
+	- Si tienes algún error durante la carga al 75% aproximadamente usa la herramienta `Fix Shaders` para que cambie la calidad de gráficos.
+
+---
+## Documentación del Launcher
 ### 2. Detección Automática
 Al abrirse, la herramienta buscará automáticamente tu instalación de Minecraft en dos ubicaciones estándar:
 En versión fuera de Flatpak:

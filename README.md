@@ -3,23 +3,57 @@
 CianovaLauncher es una interfaz gráfica moderna diseñada para facilitar la gestión, instalación y personalización de Minecraft: Bedrock Edition en Linux. Esta herramienta trabaja en conjunto con la base del proyecto **MCPELauncher-manifest**, proporcionando una experiencia de usuario amigable y potente.
 
 ### 1. Ejecución
-Para iniciar la herramienta, simplemente haz doble clic en el ejecutable `CianovaLauncher` o ejecútalo desde la terminal:
+#### Instalación para Flatpak
+##### Metodo 1 (Recomendado) - Actualizaciones
+
+Descarga el archivo `CianovaLauncher.flatpakrepo` en **RELEASE** o **EXTRA** para instalar y recibir actualizaciones desde tu gestor de software. (Esto descarga automáticamente las ultimas actualizaciones y runtimes necesarios).
+
+O añade manualmente con:
+- Añade el repositorio
 ```bash
-./CianovaLauncher
+flatpak remote-add --user --if-not-exists CianovaLauncher https://plagaplusdev.github.io/CianovaLauncher-mcpelauncher/CianovaLauncher.flatpakrepo
 ```
 
-#### Ejecución para Flatpak
-Opcion A) Instalar y recibir actualizaciones desde `CianovaLauncher.flatref` para que lo descargues desde tu gestor de software. (Esto descarga automáticamente las ultimas actualizaciones y runtimes necesarios)
+- Instalar el Launcher :
+```bash
+flatpak install --user CianovaLauncher org.cianova.Launcher
+```
 
-Opcion B) Instalar desde el `CianovaLauncher.flatpak` mas reciente publicado en el GitHub e instalar los runtimes necesarios en una terminal:
+Esto hará que se instale el launcher con sus runtimes necesarios, pero puedes instalarlos manualmente con:
+
+```bash
+flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
+```
+##### Metodo 2 - Bundle
+
+ Descarga e instala `CianovaLauncher.flatpak` en **RELEASE** publicado en el GitHub oficial del launcher y ábrelo con algún **gestor de software** que tengas o usando el comando:
+
+```bash
+flatpak install --user CianovaLauncher.flatpak
+```
+*(NOTA: El nombre del archivo también puede incluir el numero de la versión).*
+
+Eh instala los runtimes necesarios con:
 ```bash
 flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
 ```
 
-Opcion C) Compila mediante PyInstaller usando `./build.sh` y luego ejecuta `./build-flatpak.sh` que va a descargar los runtimes necesarios y automatizara la instalación en tu sistema como `--user.`
+#### Instalación no-Flatpak:
+
+Descarga de la ultima **RELEASE** el archivo `CianovaLauncher-vX.Y.tar.gz` donde `X.Y.Z` es el numero de la versión y lo extraes en alguna carpeta que desees y también compila o descarga algún paquete de binarios del **MCPELAUNCHER-MANIFEST** del proyecto oficial; o algún algún pack Pre-compilado disponible de confianza llamado `BIN X.Y.Z (DATE) + <NOTES>.tar.gz` que vas a extraer y te dejara una carpeta llamada `bin` que la colocaras dentro de la carpeta raíz del launcher (Recomendado) o donde mejor te parezca.
+
+Para iniciar el launcher, simplemente haz doble clic en el ejecutable `CianovaLauncher` o ejecútalo desde la terminal:
+
+```bash
+./CianovaLauncher
+```
+
+---
+Luego ve a Ajustes y completa la configuración de binarios, requisitos y guarda la config.
 
 **Para saber mas vaya a [MANUAL DE USO](MANUAL%DE%USO.md).**
 
+---
 ## 2. Atribución y Dependencias
 Este "launcher" solo funciona de forma independiente en su apartado visual pero cualquier opción de ejecución, extracción u otro proceso requiere la instalación previa y binarios compilados de:
 

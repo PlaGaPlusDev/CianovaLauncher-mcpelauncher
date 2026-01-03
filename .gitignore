@@ -12,3 +12,4 @@ build-dir
 repo
 repo_dist
 COMMAND.txt
+TEMPLATE_RELEASE.md
