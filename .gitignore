@@ -15,3 +15,4 @@ repo_dist
 venv
 CianovaLauncherMCPE.spec
 COMMAND.txt
+TEMPLATE_RELEASE.md
