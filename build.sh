@@ -12,7 +12,7 @@ echo "Building executable..."
 # --collect-all customtkinter es necesario para incluir los temas y archivos json de la librería
 # --add-data "icon.png:." incluye el icono dentro del ejecutable (en la raíz)
 # --icon "icon.png" establece el icono del ejecutable (para el explorador de archivos)
-./venv/bin/pyinstaller --noconfirm --onefile --windowed --name "MCPETool" --collect-all customtkinter --add-data "icon.png:." --icon "icon.png" mcpe_tool_gui.py
+./venv/bin/pyinstaller --noconfirm --onefile --windowed --name "CianovaLauncherMCPE" --collect-all customtkinter --add-data "icon.png:." --icon "icon.png" src/main.py
 
 echo "Build complete!"
 echo "Executable is located at: dist/MCPETool"
