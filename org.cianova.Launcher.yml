@@ -33,6 +33,9 @@ finish-args:
   # Acceso a GPU para OpenGL
   - --device=dri
 
+  # Permitir diálogos de archivos nativos
+  - --talk-name=org.freedesktop.portal.FileChooser
+
   # Acceso a red para descargas
   - --share=network
 

@@ -1,8 +1,9 @@
 import json
 import os
+from src import constants as c
 
 class ConfigManager:
-    def __init__(self, config_file="cianovalauncher-config.json", old_config_file=None):
+    def __init__(self, config_file=c.CONFIG_FILE_NAME, old_config_file=None):
         self.config_file = config_file
         self.old_config_file = old_config_file
 
@@ -15,18 +16,16 @@ class ConfigManager:
                 print(f"Error creando directorio de config: {e}")
 
         self.default_config = {
-            "binary_paths": {"client": "", "extract": "", "error": "", "webview": ""},
-            "mode": "Sistema (Instalado)",  # Cambiado de "Automático" a "Sistema"
-            "flatpak_app_id": "org.cianova.Launcher",  # Cambiado ID predeterminado
-            "data_path": os.path.join(
-                os.path.expanduser("~"), ".local/share/mcpelauncher"
-            ),
-            "close_on_launch": True,
-            "last_version_selected": "",
-            "window_size": "700x550",
+            c.CONFIG_KEY_BINARY_PATHS: {c.CONFIG_KEY_CLIENT: "", c.CONFIG_KEY_EXTRACT: "", c.CONFIG_KEY_ERROR: "", c.CONFIG_KEY_WEBVIEW: ""},
+            c.CONFIG_KEY_MODE: c.UI_DEFAULT_MODE,
+            c.CONFIG_KEY_FLATPAK_ID: c.DEFAULT_FLATPAK_ID,
+            "data_path": os.path.join(c.HOME_DIR, c.LOCAL_SHARE_DIR),
+            c.CONFIG_KEY_CLOSE_ON_LAUNCH: True,
+            c.CONFIG_KEY_LAST_VERSION: "",
+            c.CONFIG_KEY_WINDOW_SIZE: "700x550",
             "accepted_terms": False,
-            "appearance_mode": "Dark",
-            "color_theme": "blue",
+            c.CONFIG_KEY_APPEARANCE: "Dark",
+            c.CONFIG_KEY_COLOR_THEME: "blue",
         }
         self.config = self.load_config()
 
@@ -51,13 +50,13 @@ class ConfigManager:
                 migrated_config = {**self.default_config, **old_config}
 
                 # Actualizar valores obsoletos
-                if migrated_config.get("mode") == "Automático":
-                    migrated_config["mode"] = "Sistema (Instalado)"
+                if migrated_config.get(c.CONFIG_KEY_MODE) == "Automático":
+                    migrated_config[c.CONFIG_KEY_MODE] = c.UI_DEFAULT_MODE
                 if (
-                    migrated_config.get("flatpak_app_id")
-                    == "com.mcpelauncher.MCPELauncher"
+                    migrated_config.get(c.CONFIG_KEY_FLATPAK_ID)
+                    == c.MCPELAUNCHER_FLATPAK_ID
                 ):
-                    migrated_config["flatpak_app_id"] = "org.cianova.Launcher"
+                    migrated_config[c.CONFIG_KEY_FLATPAK_ID] = c.DEFAULT_FLATPAK_ID
 
                 # Guardar en nuevo archivo
                 self.config = migrated_config

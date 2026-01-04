@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox
 import os
 import shutil
 import time
+from src.utils.dialogs import ask_directory_native
 
 class MigrationDialog(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -11,6 +12,9 @@ class MigrationDialog(ctk.CTkToplevel):
         self.title("Gestor de Migración de Datos")
         self.geometry("600x600")  # Reducido de 700 para pantallas pequeñas
         self.resizable(False, False)
+
+        self.transient(parent)
+        self.grab_set()
 
         # ScrollableFrame principal para pantallas pequeñas
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -262,7 +266,7 @@ class MigrationDialog(ctk.CTkToplevel):
             return False
 
     def browse_src(self):
-        d = filedialog.askdirectory(title="Seleccionar carpeta de origen")
+        d = ask_directory_native(self, title="Seleccionar carpeta de origen")
         if d:
             self.entry_src.configure(state="normal", fg_color=["#F9F9FA", "#343638"])
             self.entry_src.delete(0, "end")

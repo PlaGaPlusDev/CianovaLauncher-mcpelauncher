@@ -12,27 +12,21 @@ import time
 import re
 
 from src.gui.progress_dialog import ProgressDialog
-
+from src import constants as c
+from src.utils.dialogs import ask_directory_native
 
 def get_installed_versions(app):
     """Devuelve una lista de versiones instaladas detectadas"""
     if not app.active_path:
-        # Si no está activo, intentar detectar
         detect_installation(app)
-
     if not app.active_path:
         return []
-
-    versions_dir = os.path.join(app.active_path, "versions")
+    versions_dir = os.path.join(app.active_path, c.VERSIONS_DIR)
     if not os.path.exists(versions_dir):
         return []
     try:
         return sorted(
-            [
-                d
-                for d in os.listdir(versions_dir)
-                if os.path.isdir(os.path.join(versions_dir, d))
-            ],
+            [d for d in os.listdir(versions_dir) if os.path.isdir(os.path.join(versions_dir, d))],
             reverse=True,
         )
     except:
@@ -40,37 +34,23 @@ def get_installed_versions(app):
 
 def launch_from_args(app, version):
     """Helper para lanzar una versión directamente desde argumentos"""
-    # Asegurar que las versiones estén cargadas
     versions = get_installed_versions(app)
     if version in versions:
         app.version_var.set(version)
         launch_game(app)
     else:
-        messagebox.showerror("Error", f"La versión '{version}' no está instalada.")
+        messagebox.showerror(c.UI_ERROR_TITLE, c.UI_VERSION_NOT_INSTALLED_ERROR.format(version=version))
 
-def process_apk(
-    app,
-    apk_path,
-    ver_name,
-    target_root=None,
-    is_target_flatpak=None,
-    flatpak_id=None,
-):
+def process_apk(app, apk_path, ver_name, target_root=None, is_target_flatpak=None, flatpak_id=None):
     current_root = target_root if target_root else app.active_path
     if not current_root:
-        messagebox.showerror("Error", "No se ha definido una ruta de destino.")
+        messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_TARGET_PATH_ERROR)
         return
 
-    target_dir = os.path.join(current_root, "versions", ver_name)
-    use_flatpak_logic = (
-        is_target_flatpak if is_target_flatpak is not None else app.is_flatpak
-    )
+    target_dir = os.path.join(current_root, c.VERSIONS_DIR, ver_name)
+    use_flatpak_logic = is_target_flatpak if is_target_flatpak is not None else app.is_flatpak
 
-    progress_dialog = ProgressDialog(
-        app,
-        "Extrayendo APK",
-        "Por favor espera, esto puede tardar unos minutos...",
-    )
+    progress_dialog = ProgressDialog(app, c.UI_EXTRACTING_APK_TITLE, c.UI_EXTRACTING_APK_MSG)
 
     def run_extraction():
         try:
@@ -79,26 +59,13 @@ def process_apk(
             os.makedirs(target_dir, exist_ok=True)
 
             cmd = []
-            custom_extract = app.config["binary_paths"].get("extract")
+            custom_extract = app.config[c.CONFIG_KEY_BINARY_PATHS].get(c.CONFIG_KEY_EXTRACT)
 
             if custom_extract and os.path.exists(custom_extract):
                 cmd = [custom_extract, apk_path, target_dir]
             elif use_flatpak_logic:
-                app_id = (
-                    flatpak_id
-                    if flatpak_id
-                    else app.config.get(
-                        "flatpak_app_id", "com.mcpelauncher.MCPELauncher"
-                    )
-                )
-                cmd = [
-                    "flatpak",
-                    "run",
-                    "--command=mcpelauncher-extract",
-                    app_id,
-                    apk_path,
-                    target_dir,
-                ]
+                app_id = flatpak_id if flatpak_id else app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
+                cmd = ["flatpak", "run", "--command=mcpelauncher-extract", app_id, apk_path, target_dir]
             else:
                 cmd = ["mcpelauncher-extract", apk_path, target_dir]
 
@@ -107,31 +74,18 @@ def process_apk(
             app.after(0, progress_dialog.close)
 
             if process.returncode == 0:
-                app.after(
-                    0,
-                    lambda: messagebox.showinfo(
-                        "Éxito", f"Versión {ver_name} instalada correctamente."
-                    ),
-                )
+                app.after(0, lambda: messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_EXTRACTION_SUCCESS_MSG.format(ver_name=ver_name)))
                 if current_root == app.active_path:
                     app.after(0, refresh_version_list)
             else:
                 err_msg = process.stderr
                 print(f"Error extractor: {err_msg}")
-                app.after(
-                    0,
-                    lambda: messagebox.showerror(
-                        "Error Extractor", f"El extractor falló:\n{err_msg}"
-                    ),
-                )
+                app.after(0, lambda: messagebox.showerror(c.UI_ERROR_TITLE, c.UI_EXTRACTION_ERROR_MSG.format(err_msg=err_msg)))
         except Exception as e:
             app.after(0, progress_dialog.close)
-            app.after(
-                0, lambda: messagebox.showerror("Error", f"Fallo crítico: {e}")
-            )
+            app.after(0, lambda: messagebox.showerror(c.UI_ERROR_TITLE, c.UI_CRITICAL_ERROR_MSG.format(e=e)))
 
     threading.Thread(target=run_extraction).start()
-
 
 def delete_version_dialog(app):
     version = app.version_var.get()
@@ -139,235 +93,165 @@ def delete_version_dialog(app):
         return
 
     dialog = ctk.CTkToplevel(app)
-    dialog.title("Gestionar Versión")
+    dialog.title(c.UI_MANAGE_VERSION_TITLE)
     dialog.geometry("400x200")
     dialog.resizable(False, False)
-    dialog.attributes("-topmost", True)
+    dialog.transient(app)
 
-    ctk.CTkLabel(
-        dialog,
-        text=f"¿Qué deseas hacer con la versión '{version}'?",
-        font=ctk.CTkFont(size=14),
-    ).pack(pady=20)
+    ctk.CTkLabel(dialog, text=c.UI_MANAGE_VERSION_PROMPT.format(version=version), font=ctk.CTkFont(size=14)).pack(pady=20)
 
     def do_move():
         try:
-            backup_dir = os.path.join(app.home, "MCPELauncher-OLD")
+            backup_dir = os.path.join(app.home, c.BACKUP_DIR)
             if not os.path.exists(backup_dir):
                 os.makedirs(backup_dir)
-            src = os.path.join(app.active_path, "versions", version)
+            src = os.path.join(app.active_path, c.VERSIONS_DIR, version)
             dst = os.path.join(backup_dir, version)
             if os.path.exists(dst):
                 shutil.rmtree(dst)
             shutil.move(src, backup_dir)
             refresh_version_list(app)
-            messagebox.showinfo("Listo", "Versión movida al respaldo.")
+            messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_VERSION_MOVED_MSG)
             dialog.destroy()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            messagebox.showerror(c.UI_ERROR_TITLE, str(e))
 
     def do_delete():
-        if messagebox.askyesno(
-            "Confirmar Eliminación",
-            f"¿Estás seguro de eliminar PERMANENTEMENTE '{version}'?\nEsta acción no se puede deshacer.",
-        ):
+        if messagebox.askyesno(c.UI_CONFIRM_DELETE_TITLE, c.UI_CONFIRM_PERMANENT_DELETE.format(version=version)):
             try:
-                src = os.path.join(app.active_path, "versions", version)
+                src = os.path.join(app.active_path, c.VERSIONS_DIR, version)
                 shutil.rmtree(src)
                 refresh_version_list(app)
-                messagebox.showinfo("Listo", "Versión eliminada.")
+                messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_VERSION_DELETED_MSG)
                 dialog.destroy()
             except Exception as e:
-                messagebox.showerror("Error", str(e))
+                messagebox.showerror(c.UI_ERROR_TITLE, str(e))
 
     btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
     btn_frame.pack(fill="x", padx=20, pady=10)
 
-    ctk.CTkButton(
-        btn_frame,
-        text="Mover a Respaldo",
-        fg_color="orange",
-        hover_color="darkorange",
-        command=do_move,
-    ).pack(side="left", fill="x", expand=True, padx=5)
-    ctk.CTkButton(
-        btn_frame,
-        text="Eliminar",
-        fg_color="red",
-        hover_color="darkred",
-        command=do_delete,
-    ).pack(side="right", fill="x", expand=True, padx=5)
+    ctk.CTkButton(btn_frame, text=c.UI_MOVE_TO_BACKUP, fg_color=c.COLOR_ORANGE_BUTTON, hover_color=c.COLOR_ORANGE_BUTTON_HOVER, command=do_move).pack(side="left", fill="x", expand=True, padx=5)
+    ctk.CTkButton(btn_frame, text=c.UI_DELETE_PERMANENTLY, fg_color=c.COLOR_RED_BUTTON, hover_color=c.COLOR_RED_BUTTON_HOVER, command=do_delete).pack(side="right", fill="x", expand=True, padx=5)
 
     dialog.update_idletasks()
     x = app.winfo_x() + (app.winfo_width() // 2) - (dialog.winfo_width() // 2)
     y = app.winfo_y() + (app.winfo_height() // 2) - (dialog.winfo_height() // 2)
     dialog.geometry(f"+{x}+{y}")
-
+    dialog.grab_set()
 
 def disable_shaders(app):
     if not app.active_path:
         return
-    options_path = os.path.join(
-        app.active_path, "games/com.mojang/minecraftpe/options.txt"
-    )
+    options_path = os.path.join(app.active_path, c.MINECRAFT_PE_DIR_ALT, c.OPTIONS_FILE)
 
     try:
         with open(options_path, "r") as f:
             content = f.read()
-        new_content = content.replace("graphics_mode:2", "graphics_mode:0").replace(
-            "graphics_mode:1", "graphics_mode:0"
-        )
+        new_content = content.replace("graphics_mode:2", "graphics_mode:0").replace("graphics_mode:1", "graphics_mode:0")
         with open(options_path, "w") as f:
             f.write(new_content)
-
         check_shader_status(app)
-        messagebox.showinfo("Listo", "Shaders desactivados (Modo 0).")
+        messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_SHADERS_DISABLED_MSG)
     except Exception as e:
-        messagebox.showerror("Error", str(e))
-
+        messagebox.showerror(c.UI_ERROR_TITLE, str(e))
 
 def open_data_folder(app):
     if app.active_path:
         subprocess.Popen(["xdg-open", app.active_path])
 
-
 def detect_installation(app, mode_override=None):
-    mode_str = (
-        mode_override
-        if mode_override
-        else app.config.get("mode", "Sistema (Instalado)")
-    )
-    flatpak_id_config = app.config.get(
-        "flatpak_app_id", "org.cianova.Launcher"
-    )
-    flatpak_id = flatpak_id_config
+    mode_str = mode_override if mode_override else app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE)
+    flatpak_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.DEFAULT_FLATPAK_ID)
 
     std_local_path = app.compiled_path
-    std_local_shared = os.path.join(app.home, ".local/share/mcpelauncher")
+    std_local_shared = os.path.join(app.home, c.LOCAL_SHARE_DIR)
 
+    status_text, status_color = "", "gray"
     if mode_str == "Local (Propio)":
-        app.lbl_status.configure(
-            text="● Modo: Local (Datos Propios)", text_color="#27ae60"
-        )
+        status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
         app.is_flatpak = False
-        app.active_path = (
-            app.our_data_path if app.running_in_flatpak else std_local_path
-        )
+        app.active_path = app.our_data_path if app.running_in_flatpak else std_local_path
     elif mode_str == "Local (Compartido)":
-        app.lbl_status.configure(
-            text="● Modo: Local (Compartido .local)", text_color="#27ae60"
-        )
+        status_text, status_color = c.UI_STATUS_LOCAL_SHARED, "#27ae60"
         app.is_flatpak = False
         app.active_path = std_local_shared
     elif mode_str == "Local":
-        app.lbl_status.configure(text="● Modo: Local (.local)", text_color="#27ae60")
+        status_text, status_color = c.UI_STATUS_LOCAL, "#27ae60"
         app.is_flatpak = False
         app.active_path = std_local_path
     elif "Flatpak" in mode_str and "Personalizado" in mode_str:
-        flatpak_id = app.config.get("flatpak_app_id", "org.cianova.Launcher")
-        app.lbl_status.configure(
-            text=f"● Modo: Flatpak ({flatpak_id})", text_color="#3498db"
-        )
+        status_text, status_color = c.UI_STATUS_FLATPAK_CUSTOM.format(flatpak_id=flatpak_id), "#3498db"
         app.is_flatpak = True
-        std_flatpak_path = os.path.join(
-            app.home, f".var/app/{flatpak_id}/data/mcpelauncher"
-        )
+        std_flatpak_path = os.path.join(app.home, f"{c.FLATPAK_DATA_DIR}/{flatpak_id}/{c.MCPELAUNCHER_DATA_SUBDIR}")
         app.active_path = std_flatpak_path
         app.flatpak_path = std_flatpak_path
         if not os.path.exists(app.active_path):
-            app.lbl_status.configure(
-                text="● Flatpak: Datos no encontrados", text_color="orange"
-            )
+            status_text, status_color = c.UI_STATUS_FLATPAK_NO_DATA, "orange"
         try:
-            app.btn_verify_deps.configure(text="Verificar Dependencias [Flatpak]")
-        except:
-            pass
+            app.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_FLATPAK)
+        except: pass
     else:
-        app.lbl_status.configure(text=f"● Modo: {mode_str}", text_color="#27ae60")
+        status_text, status_color = f"● Modo: {mode_str}", "#27ae60"
         app.is_flatpak = False
         app.active_path = std_local_path
-        if not os.path.exists(os.path.join(app.active_path, "versions")):
-            app.lbl_status.configure(
-                text="● Local: Sin versiones", text_color="gray"
-            )
+        if not os.path.exists(os.path.join(app.active_path, c.VERSIONS_DIR)):
+            status_text, status_color = c.UI_STATUS_LOCAL_NO_VERSIONS, "gray"
         try:
-            app.btn_verify_deps.configure(text="Verificar Dependencias [Local]")
-        except:
-            pass
+            app.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_LOCAL)
+        except: pass
+
+    app.lbl_status.configure(text=status_text, text_color=status_color)
 
     if app.active_path and not app.is_flatpak:
         try:
             os.makedirs(app.active_path, exist_ok=True)
-        except OSError:
-            pass
+        except OSError: pass
 
     refresh_version_list(app)
     check_shader_status(app)
     try:
         app.combo_mode.set(mode_str)
-    except Exception:
-        pass
-    try:
-        app.combo_settings_mode.set(app.config.get("mode", "Personalizado"))
-    except Exception:
-        pass
-    try:
-        app.on_settings_mode_change(app.config.get("mode", "Personalizado"))
-    except Exception:
-        pass
-    refresh_version_list(app)
-    check_shader_status(app)
-
+        app.combo_settings_mode.set(app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
+        app.on_settings_mode_change(app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
+    except Exception: pass
 
 def change_mode_ui(app, mode_str):
     if mode_str == "Flatpak (Custom)":
         dialog = ctk.CTkToplevel(app)
-        dialog.title("Configurar Flatpak Personalizado")
+        dialog.title(c.UI_CONFIG_FLATPAK_CUSTOM_TITLE)
         dialog.geometry("400x180")
-        dialog.attributes("-topmost", True)
+        dialog.transient(app)
         dialog.resizable(False, False)
 
-        ctk.CTkLabel(
-            dialog, text="ID de Aplicación Flatpak:", font=ctk.CTkFont(size=13)
-        ).pack(pady=(20, 5))
-
+        ctk.CTkLabel(dialog, text=c.UI_FLATPAK_ID_LABEL, font=ctk.CTkFont(size=13)).pack(pady=(20, 5))
         entry_id = ctk.CTkEntry(dialog, width=300)
         entry_id.pack(pady=5)
-        current_id = app.config.get(
-            "flatpak_app_id", "com.mcpelauncher.MCPELauncher"
-        )
+        current_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
         entry_id.insert(0, current_id)
-
-        ctk.CTkLabel(
-            dialog,
-            text="Ejemplo: org.mcpelauncher.Other",
-            text_color="gray",
-            font=ctk.CTkFont(size=10),
-        ).pack(pady=2)
+        ctk.CTkLabel(dialog, text=c.UI_FLATPAK_ID_EXAMPLE, text_color="gray", font=ctk.CTkFont(size=10)).pack(pady=2)
 
         def save_and_apply():
             new_id = entry_id.get().strip()
             if new_id:
-                app.config["flatpak_app_id"] = new_id
+                app.config[c.CONFIG_KEY_FLATPAK_ID] = new_id
                 dialog.destroy()
                 detect_installation(app, mode_override="Flatpak (Personalizado)")
             else:
-                messagebox.showwarning(
-                    "ID Requerido", "Por favor ingresa un ID válido."
-                )
+                messagebox.showwarning(c.UI_INFO_TITLE, c.UI_FLATPAK_ID_REQUIRED_MSG)
 
-        ctk.CTkButton(dialog, text="Usar ID", command=save_and_apply).pack(pady=10)
+        ctk.CTkButton(dialog, text=c.UI_BUTTON_USE_ID, command=save_and_apply).pack(pady=10)
+        dialog.grab_set()
     else:
         detect_installation(app, mode_override=mode_str)
 
 def is_running_in_flatpak():
-    return os.path.exists("/.flatpak-info")
+    return os.path.exists(c.FLATPAK_INFO_FILE)
 
 def get_flatpak_app_id():
     if not is_running_in_flatpak():
         return None
     try:
-        with open("/.flatpak-info", "r") as f:
+        with open(c.FLATPAK_INFO_FILE, "r") as f:
             for line in f:
                 if line.startswith("app="):
                     return line.split("=")[1].strip()
@@ -375,220 +259,146 @@ def get_flatpak_app_id():
         return None
     return None
 
-def get_flatpak_binary(binary_name):
-    if is_running_in_flatpak():
-        flatpak_bin = f"/app/bin/{binary_name}"
-        if os.path.exists(flatpak_bin):
-            return flatpak_bin
-    return shutil.which(binary_name)
-
 def setup_flatpak_environment(app):
     if not app.running_in_flatpak:
         return
 
     if os.path.exists("/app/bin/mcpelauncher-client"):
-        if app.config.get("mode") is None or app.config.get(
-            "first_run_flatpak", True
-        ):
-            app.config["mode"] = "Flatpak Empaquetado"
-            app.config["binary_paths"] = {
-                "client": "/app/bin/mcpelauncher-client",
-                "extract": "/app/bin/mcpelauncher-extract",
-                "webview": "/app/bin/mcpelauncher-webview",
-                "error": "/app/bin/mcpelauncher-error",
+        if app.config.get(c.CONFIG_KEY_MODE) is None or app.config.get(c.CONFIG_KEY_FIRST_RUN_FLATPAK, True):
+            app.config[c.CONFIG_KEY_MODE] = "Flatpak Empaquetado"
+            app.config[c.CONFIG_KEY_BINARY_PATHS] = {
+                c.CONFIG_KEY_CLIENT: "/app/bin/mcpelauncher-client",
+                c.CONFIG_KEY_EXTRACT: "/app/bin/mcpelauncher-extract",
+                c.CONFIG_KEY_WEBVIEW: "/app/bin/mcpelauncher-webview",
+                c.CONFIG_KEY_ERROR: "/app/bin/mcpelauncher-error",
             }
-            app.config["first_run_flatpak"] = False
+            app.config[c.CONFIG_KEY_FIRST_RUN_FLATPAK] = False
             app.config_manager.save_config()
 
 def check_migration_needed(app):
     if not app.running_in_flatpak:
         return
-
-    old_local_path = os.path.join(app.home, ".local/share/mcpelauncher")
-
-    if app.config.get("migration_notified", False):
+    old_local_path = os.path.join(app.home, c.LOCAL_SHARE_DIR)
+    if app.config.get(c.CONFIG_KEY_MIGRATION_NOTIFIED, False) or not os.path.exists(old_local_path):
         return
-
-    if not os.path.exists(old_local_path):
-        return
-
-    old_versions = os.path.join(old_local_path, "versions")
+    old_versions = os.path.join(old_local_path, c.VERSIONS_DIR)
     if not os.path.exists(old_versions) or not os.listdir(old_versions):
         return
-
-    messagebox.showinfo(
-        "Datos Detectados",
-        "Se detectaron datos de una instalación anterior en .local.\n"
-        "Puedes importarlos desde la pestaña 'Herramientas' > 'Migración de Datos'.",
-    )
-    app.config["migration_notified"] = True
+    messagebox.showinfo(c.UI_DATA_DETECTED_TITLE, c.UI_MIGRATION_PROMPT_MSG)
+    app.config[c.CONFIG_KEY_MIGRATION_NOTIFIED] = True
     app.config_manager.save_config()
 
 def resolve_version(version_path):
+    # This function's internal strings relate to game data structure, not app UI/paths.
+    # Keeping them here for clarity and separation of concerns.
     if os.path.islink(version_path):
         try:
-            target = os.readlink(version_path)
-            return os.path.basename(target)
-        except OSError:
-            pass
+            return os.path.basename(os.readlink(version_path))
+        except OSError: pass
 
     try:
         v_txt = os.path.join(version_path, "version_name.txt")
         if os.path.exists(v_txt):
-            with open(v_txt, "r") as f:
-                return f.read().strip()
-    except OSError:
-        pass
+            with open(v_txt, "r") as f: return f.read().strip()
+    except OSError: pass
 
     possible_manifests = [
-        "assets/packs/vanilla/manifest.json",
-        "assets/resource_packs/vanilla/manifest.json",
-        "assets/behavior_packs/vanilla/manifest.json",
-        "assets/resource_packs/vanilla_1.20/manifest.json",
-        "assets/resource_packs/vanilla_1.19/manifest.json",
+        "assets/packs/vanilla/manifest.json", "assets/resource_packs/vanilla/manifest.json",
+        "assets/behavior_packs/vanilla/manifest.json", "assets/resource_packs/vanilla_1.20/manifest.json",
+        "assets/resource_packs/vanilla_1.19/manifest.json"
     ]
-
     for rel_path in possible_manifests:
         try:
             manifest = os.path.join(version_path, rel_path)
             if os.path.exists(manifest):
-                with open(manifest, "r") as f:
-                    data = json.load(f)
-                    ver_list = data.get("header", {}).get("version", [])
-                    if ver_list:
-                        return ".".join(map(str, ver_list))
-        except (OSError, json.JSONDecodeError):
-            pass
-
+                with open(manifest, "r") as f: data = json.load(f)
+                ver_list = data.get("header", {}).get("version", [])
+                if ver_list: return ".".join(map(str, ver_list))
+        except (OSError, json.JSONDecodeError): pass
     return None
 
 def refresh_version_list(app):
     for widget in app.version_listbox.winfo_children():
         widget.destroy()
     app.version_cards = {}
-
     if not app.active_path:
         return
 
-    versions_dir = os.path.join(app.active_path, "versions")
+    versions_dir = os.path.join(app.active_path, c.VERSIONS_DIR)
     if not os.path.exists(versions_dir):
-        ctk.CTkLabel(
-            app.version_listbox, text="No se encontró la carpeta 'versions'"
-        ).pack()
+        ctk.CTkLabel(app.version_listbox, text=c.UI_NO_VERSIONS_FOLDER_MSG).pack()
         return
 
     try:
-        versions = sorted(
-            [
-                d
-                for d in os.listdir(versions_dir)
-                if os.path.isdir(os.path.join(versions_dir, d))
-            ]
-        )
-
+        versions = sorted([d for d in os.listdir(versions_dir) if os.path.isdir(os.path.join(versions_dir, d))])
         if not versions:
-            ctk.CTkLabel(
-                app.version_listbox, text="No hay versiones instaladas."
-            ).pack()
+            ctk.CTkLabel(app.version_listbox, text=c.UI_NO_VERSIONS_INSTALLED).pack()
             return
 
         for v in versions:
             display_name = v
             if v == "current":
                 real_ver = resolve_version(os.path.join(versions_dir, v))
-                if real_ver:
-                    display_name = f"current (Detectada: {real_ver})"
+                if real_ver: display_name = f"current (Detectada: {real_ver})"
 
-            card = ctk.CTkFrame(
-                app.version_listbox,
-                corner_radius=10,
-                fg_color=("gray85", "gray25"),
-            )
+            card = ctk.CTkFrame(app.version_listbox, corner_radius=10, fg_color=("gray85", "gray25"))
             card.pack(fill="x", pady=5, padx=5)
-
             if app.app_icon_image:
                 lbl_icon = ctk.CTkLabel(card, text="", image=app.app_icon_image)
                 lbl_icon.pack(side="left", padx=10, pady=10)
-                lbl_icon.bind(
-                    "<Button-1>", lambda e, ver=v: select_version(app, ver)
-                )
-
-            lbl_text = ctk.CTkLabel(
-                card, text=display_name, font=ctk.CTkFont(size=14, weight="bold")
-            )
+                lbl_icon.bind("<Button-1>", lambda e, ver=v: select_version(app, ver))
+            lbl_text = ctk.CTkLabel(card, text=display_name, font=ctk.CTkFont(size=14, weight="bold"))
             lbl_text.pack(side="left", padx=10)
-
             card.bind("<Button-1>", lambda e, ver=v: select_version(app, ver))
             lbl_text.bind("<Button-1>", lambda e, ver=v: select_version(app, ver))
-
             app.version_cards[v] = card
 
-        last_ver = app.config.get("last_version")
+        last_ver = app.config.get(c.CONFIG_KEY_LAST_VERSION)
         if last_ver and last_ver in versions:
             select_version(app, last_ver)
         elif versions and not app.version_var.get():
             select_version(app, versions[0])
-
     except Exception as e:
-        ctk.CTkLabel(
-            app.version_listbox, text=f"Error al listar versiones: {e}"
-        ).pack()
+        ctk.CTkLabel(app.version_listbox, text=c.UI_ERROR_LISTING_VERSIONS.format(e=e)).pack()
 
 def select_version(app, version):
     app.version_var.set(version)
     for v, card in app.version_cards.items():
-        if v == version:
-            card.configure(fg_color=("#2cc96b", "#1e8449"))
-        else:
-            card.configure(fg_color=("gray85", "gray25"))
+        card.configure(fg_color=(c.COLOR_PRIMARY_GREEN, c.COLOR_SELECTED_GREEN) if v == version else ("gray85", "gray25"))
 
 def check_shader_status(app):
     if not app.active_path:
         return
-    options_path = os.path.join(
-        app.active_path, "games/com.mojang/minecraftpe/options.txt"
-    )
-    status = "Desconocido"
-    color = "gray"
+    options_path = os.path.join(app.active_path, c.MINECRAFT_PE_DIR_ALT, c.OPTIONS_FILE)
+    status, color = c.UI_SHADER_STATUS_UNKNOWN, "gray"
     if os.path.exists(options_path):
         try:
             with open(options_path, "r") as f:
                 for line in f:
                     if "graphics_mode:" in line:
                         val = line.strip().split(":")[1]
-                        if val == "0":
-                            status = "0 (Simple)"
-                            color = "green"
-                        elif val == "1":
-                            status = "1 (Fancy)"
-                            color = "orange"
-                        elif val == "2":
-                            status = "2 (Vibrant - Activo)"
-                            color = "red"
+                        if val == "0": status, color = c.UI_SHADER_STATUS_SIMPLE, "green"
+                        elif val == "1": status, color = c.UI_SHADER_STATUS_FANCY, "orange"
+                        elif val == "2": status, color = c.UI_SHADER_STATUS_VIBRANT, "red"
                         break
-        except OSError:
-            pass
-    app.lbl_shader_status.configure(
-        text=f"Estado Shaders: {status}", text_color=color
-    )
+        except OSError: pass
+    app.lbl_shader_status.configure(text=f"Estado Shaders: {status}", text_color=color)
 
 def launch_game(app):
     version = app.version_var.get()
     if not version:
-        messagebox.showwarning("Atención", "Por favor selecciona una versión.")
+        messagebox.showwarning(c.UI_INFO_TITLE, c.UI_PLEASE_SELECT_VERSION_MSG)
         return
 
-    version_path = os.path.join(app.active_path, "versions", version)
+    version_path = os.path.join(app.active_path, c.VERSIONS_DIR, version)
     cmd = []
-    mode = app.config.get("mode", "Personalizado")
-    flatpak_id = app.config.get("flatpak_app_id", "com.mcpelauncher.MCPELauncher")
+    mode = app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE)
+    flatpak_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
 
     if "Personalizado" in mode:
-        client = app.config["binary_paths"].get("client")
+        client = app.config[c.CONFIG_KEY_BINARY_PATHS].get(c.CONFIG_KEY_CLIENT)
         if not client or not os.path.exists(client):
-            messagebox.showerror(
-                "Error", "Ruta de Cliente no configurada o inválida."
-            )
+            messagebox.showerror(c.UI_ERROR_TITLE, c.UI_CLIENT_PATH_ERROR)
             return
         cmd = [client, "-dg", version_path]
     elif "Flatpak" in mode:
@@ -596,60 +406,40 @@ def launch_game(app):
     elif "Local" in mode:
         local_bin = os.path.join(os.getcwd(), "bin", "mcpelauncher-client")
         if not os.path.exists(local_bin):
-            messagebox.showerror(
-                "Error", f"No se encontró el binario local en: {local_bin}"
-            )
+            messagebox.showerror(c.UI_ERROR_TITLE, c.UI_LOCAL_BINARY_NOT_FOUND.format(local_bin=local_bin))
             return
         cmd = [local_bin, "-dg", version_path]
     elif "Sistema" in mode:
         sys_bin = "/usr/local/bin/mcpelauncher-client"
         if not os.path.exists(sys_bin) and not shutil.which("mcpelauncher-client"):
-            messagebox.showerror(
-                "Error", "No se encontró mcpelauncher-client en el sistema."
-            )
+            messagebox.showerror(c.UI_ERROR_TITLE, c.UI_SYSTEM_BINARY_NOT_FOUND)
             return
-        cmd = [
-            sys_bin if os.path.exists(sys_bin) else "mcpelauncher-client",
-            "-dg",
-            version_path,
-        ]
+        cmd = [sys_bin if os.path.exists(sys_bin) else "mcpelauncher-client", "-dg", version_path]
 
     try:
         print(f"Ejecutando ({mode}): {' '.join(cmd)}")
-        app.config["last_version"] = version
-        app.config["debug_log"] = app.var_debug_log.get()
-        app.config["close_on_launch"] = app.var_close_on_launch.get()
+        app.config[c.CONFIG_KEY_LAST_VERSION] = version
+        app.config[c.CONFIG_KEY_DEBUG_LOG] = app.var_debug_log.get()
+        app.config[c.CONFIG_KEY_CLOSE_ON_LAUNCH] = app.var_close_on_launch.get()
         app.config_manager.save_config()
 
         env = os.environ.copy()
         if "Personalizado" in mode:
-            bin_dirs = set()
-            for bin_key in ["client", "extract", "error", "webview"]:
-                bin_path = app.config["binary_paths"].get(bin_key, "")
-                if bin_path and os.path.exists(bin_path):
-                    bin_dirs.add(os.path.dirname(bin_path))
+            bin_dirs = {os.path.dirname(p) for k, p in app.config[c.CONFIG_KEY_BINARY_PATHS].items() if p and os.path.exists(p)}
             if bin_dirs:
                 path_additions = ":".join(bin_dirs)
                 env["PATH"] = f"{path_additions}:{env.get('PATH', '')}"
-                env["LD_LIBRARY_PATH"] = (
-                    f"{path_additions}:{env.get('LD_LIBRARY_PATH', '')}"
-                )
+                env["LD_LIBRARY_PATH"] = f"{path_additions}:{env.get('LD_LIBRARY_PATH', '')}"
 
         if app.var_debug_log.get():
-            terms = [
-                "gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal",
-                "lxterminal", "tilix", "alacritty", "kitty",
-                "x-terminal-emulator", "xterm",
-            ]
+            terms = ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "alacritty", "kitty", "x-terminal-emulator", "xterm"]
             selected_term = next((t for t in terms if shutil.which(t)), None)
             if selected_term:
                 bash_cmd = f"{' '.join(cmd)}; echo; read -p 'Presiona Enter para cerrar...'"
-                if selected_term == "gnome-terminal":
-                    subprocess.Popen([selected_term, "--", "bash", "-c", bash_cmd])
-                else:
-                    subprocess.Popen([selected_term, "-e", f'bash -c "{bash_cmd}"'])
+                popen_args = [selected_term, "--", "bash", "-c", bash_cmd] if selected_term == "gnome-terminal" else [selected_term, "-e", f'bash -c "{bash_cmd}"']
+                subprocess.Popen(popen_args)
             else:
-                messagebox.showerror("Error", "No se encontró terminal compatible.")
+                messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_COMPATIBLE_TERMINAL)
                 subprocess.Popen(cmd, cwd=app.active_path, env=env)
         else:
             subprocess.Popen(cmd, cwd=app.active_path, env=env)
@@ -657,204 +447,123 @@ def launch_game(app):
         if app.check_close_on_launch.get():
             app.destroy()
     except Exception as e:
-        messagebox.showerror("Error", f"Fallo al lanzar: {e}")
+        messagebox.showerror(c.UI_ERROR_TITLE, c.UI_LAUNCH_ERROR.format(e=e))
 
 def export_worlds_dialog(app):
-    if not app.active_path:
-        return
-    worlds_path = os.path.join(app.active_path, "games/com.mojang/minecraftWorlds")
+    if not app.active_path: return
+    worlds_path = os.path.join(app.active_path, c.WORLDS_DIR)
     if not os.path.exists(worlds_path):
-        messagebox.showinfo("Info", "No se encontraron mundos.")
+        messagebox.showinfo(c.UI_INFO_TITLE, c.UI_NO_WORLDS_FOUND)
         return
 
-    worlds = [
-        d
-        for d in os.listdir(worlds_path)
-        if os.path.isdir(os.path.join(worlds_path, d))
-    ]
-    if not worlds:
-        return
+    worlds = [d for d in os.listdir(worlds_path) if os.path.isdir(os.path.join(worlds_path, d))]
+    if not worlds: return
 
     top = ctk.CTkToplevel(app)
-    top.title("Exportar Mundos")
+    top.title(c.UI_EXPORT_WORLDS_TITLE)
     top.geometry("500x600")
+    top.transient(app)
 
-    scroll = ctk.CTkScrollableFrame(top, label_text="Selecciona Mundos")
+    scroll = ctk.CTkScrollableFrame(top, label_text=c.UI_SELECT_WORLDS_LABEL)
     scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
     vars = []
     for w in worlds:
         display_name = w
         try:
-            with open(os.path.join(worlds_path, w, "levelname.txt"), "r") as f:
-                display_name = f"{f.read().strip()} ({w})"
-        except OSError:
-            pass
+            with open(os.path.join(worlds_path, w, "levelname.txt"), "r") as f: display_name = f"{f.read().strip()} ({w})"
+        except OSError: pass
         v = ctk.IntVar()
         vars.append((w, v))
-        ctk.CTkCheckBox(scroll, text=display_name, variable=v).pack(
-            anchor="w", pady=2
-        )
-
-    def select_all():
-        for _, v in vars:
-            v.set(1)
+        ctk.CTkCheckBox(scroll, text=display_name, variable=v).pack(anchor="w", pady=2)
 
     def do_export():
         selected = [w for w, v in vars if v.get() == 1]
-        if not selected:
-            return
-        dest_dir = filedialog.askdirectory(title="Selecciona carpeta de destino")
-        if not dest_dir:
-            return
+        if not selected: return
+        dest_dir = ask_directory_native(top, title=c.UI_SELECT_DEST_FOLDER_TITLE)
+        if not dest_dir: return
         count = 0
         for w_code in selected:
             try:
                 src = os.path.join(worlds_path, w_code)
                 name = w_code
                 try:
-                    with open(os.path.join(src, "levelname.txt"), "r") as f:
-                        name = "".join(
-                            x for x in f.read().strip() if x.isalnum() or x in " -_"
-                        )
-                except OSError:
-                    pass
+                    with open(os.path.join(src, "levelname.txt"), "r") as f: name = "".join(x for x in f.read().strip() if x.isalnum() or x in " -_")
+                except OSError: pass
                 save_path = os.path.join(dest_dir, f"{name}.mcworld")
                 temp_base = os.path.join(dest_dir, f"{name}_temp")
                 created_zip = shutil.make_archive(temp_base, "zip", src)
                 shutil.move(created_zip, save_path)
-                if os.path.exists(temp_base + ".zip"):
-                    os.remove(temp_base + ".zip")
+                if os.path.exists(temp_base + ".zip"): os.remove(temp_base + ".zip")
                 count += 1
             except Exception as e:
                 print(f"Error exportando {w_code}: {e}")
-        messagebox.showinfo("Éxito", f"{count} mundos exportados a {dest_dir}")
+        messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_WORLDS_EXPORTED_SUCCESS.format(count=count, dest_dir=dest_dir))
         top.destroy()
 
     btn_frame = ctk.CTkFrame(top)
     btn_frame.pack(fill="x", pady=10)
-    ctk.CTkButton(btn_frame, text="Seleccionar Todo", command=select_all).pack(
-        side="left", padx=10
-    )
-    ctk.CTkButton(btn_frame, text="Exportar Seleccionados", command=do_export).pack(
-        side="right", padx=10
-    )
+    ctk.CTkButton(btn_frame, text=c.UI_BUTTON_SELECT_ALL, command=lambda: [v.set(1) for _, v in vars]).pack(side="left", padx=10)
+    ctk.CTkButton(btn_frame, text=c.UI_BUTTON_EXPORT_SELECTED, command=do_export).pack(side="right", padx=10)
+
+    top.grab_set()
 
 def export_screenshots_dialog(app):
-    base_paths = list(set([p for p in [
-        app.flatpak_path, app.compiled_path, app.active_path
-    ] if p]))
-    possible_subpaths = [
-        "games/com.mojang/Screenshots", "games/com.mojang/screenshots",
-        "games/com.mojang/minecraftpe/screenshots", "games/com.mojang/minecraftpe/Screenshots"
-    ]
-    screens_path = next(
-        (os.path.join(base, sub) for base in base_paths for sub in possible_subpaths if os.path.exists(os.path.join(base, sub))),
-        None
-    )
+    base_paths = list(set([p for p in [app.flatpak_path, app.compiled_path, app.active_path] if p]))
+    possible_subpaths = [c.SCREENSHOTS_DIR, c.SCREENSHOTS_DIR_ALT, os.path.join(c.MINECRAFT_PE_DIR_ALT, c.SCREENSHOTS_DIR_ALT), os.path.join(c.MINECRAFT_PE_DIR_ALT, c.SCREENSHOTS_DIR)]
+    screens_path = next((os.path.join(base, sub) for base in base_paths for sub in possible_subpaths if os.path.exists(os.path.join(base, sub))), None)
 
     if not screens_path:
         fallback_path = os.path.join(app.active_path, "games/com.mojang") if app.active_path else None
-        msg = "No se encontró la carpeta específica 'Screenshots'."
+        msg = c.UI_SCREENSHOTS_NOT_FOUND_MSG
         if fallback_path and os.path.exists(fallback_path):
-            if messagebox.askyesno("No encontrado", f"{msg}\n\n¿Quieres abrir la carpeta 'com.mojang' para buscarla manualmente?"):
+            if messagebox.askyesno(c.UI_INFO_TITLE, c.UI_OPEN_COMOJANG_FOLDER_PROMPT.format(msg=msg)):
                 subprocess.Popen(["xdg-open", fallback_path])
         else:
-            messagebox.showinfo("Info", msg)
+            messagebox.showinfo(c.UI_INFO_TITLE, msg)
         return
     try:
         subprocess.Popen(["xdg-open", screens_path])
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo abrir la carpeta: {e}")
+        messagebox.showerror(c.UI_ERROR_TITLE, c.UI_CANNOT_OPEN_FOLDER_ERROR.format(e=e))
 
 def show_flatpak_runtime_info(app):
     dialog = ctk.CTkToplevel(app)
-    dialog.title("Requisitos de Runtime Flatpak")
+    dialog.title(c.UI_FLATPAK_RUNTIME_INFO_TITLE)
     dialog.geometry("550x400")
     dialog.resizable(False, False)
-    dialog.attributes("-topmost", True)
+    dialog.transient(app)
     ctk.CTkLabel(dialog, text="Información de Runtimes", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-    info_text = """✅ Runtimes Requeridos:
-• org.kde.Platform//5.15-23.08
-• io.qt.qtwebengine.BaseApp//5.15-23.08
-ℹ️ Estas dependencias se instalaron automáticamente.
-📋 Para verificar manualmente:
-flatpak list --runtime | grep "org.kde"
-🔧 Si falta algún runtime:
-flatpak install flathub org.kde.Platform//5.15-23.08
-flatpak install flathub io.qt.qtwebengine.BaseApp//5.15-23.08"""
     text_frame = ctk.CTkFrame(dialog)
     text_frame.pack(fill="both", expand=True, padx=20, pady=10)
     textbox = ctk.CTkTextbox(text_frame, font=ctk.CTkFont(family="Courier", size=12), wrap="word", fg_color=["#F5F5F5", "#2B2B2B"])
     textbox.pack(fill="both", expand=True, padx=5, pady=5)
-    textbox.insert("1.0", info_text)
+    textbox.insert("1.0", c.UI_FLATPAK_RUNTIME_INFO_TEXT)
     textbox.configure(state="disabled")
-    ctk.CTkButton(dialog, text="Cerrar", command=dialog.destroy, height=35, width=120).pack(pady=10)
+    ctk.CTkButton(dialog, text=c.UI_BUTTON_CLOSE, command=dialog.destroy, height=35, width=120).pack(pady=10)
+    dialog.grab_set()
 
 def verify_dependencies(app):
     if app.running_in_flatpak:
         show_flatpak_runtime_info(app)
         return
 
-    def run_check():
-        app.after(0, lambda: prog.title("Verificando..."))
-        if app.is_flatpak:
-            try:
-                if not shutil.which("flatpak"):
-                    raise Exception("Comando 'flatpak' no encontrado.")
-                if not hasattr(app, "flatpak_list_cache") or app.flatpak_list_cache is None:
-                    app.after(0, lambda: lbl_prog.configure(text="Consultando paquetes Flatpak..."))
-                    app.flatpak_list_cache = subprocess.check_output(["flatpak", "list", "--app"], text=True)
-                res = app.flatpak_list_cache
-                flatpak_id = app.config.get("flatpak_app_id", "org.cianova.Launcher")
-                if flatpak_id not in res:
-                    app.after(0, lambda: show_result(False, f"La aplicación Flatpak '{flatpak_id}' no parece estar instalada."))
-                else:
-                    app.after(0, lambda: show_result(True, f"✅ Flatpak detectado correctamente.\nID: {flatpak_id}"))
-            except Exception as e:
-                app.after(0, lambda: show_result(False, f"Error verificando Flatpak:\n{e}"))
-            return
+    dependency_map = {
+        "APT": (["dpkg", "-s"], "apt install -y", ["libgl1", "libegl1", "libx11-6", "zenity", "pulseaudio-utils", "libcurl4", "unzip"]),
+        "DNF": (["rpm", "-q"], "dnf install -y", ["libglvnd-glx", "libglvnd-egl", "libX11", "zenity", "pulseaudio-utils", "libcurl", "unzip"]),
+        "PACMAN": (["pacman", "-Q"], "pacman -S --noconfirm --needed", ["libgl", "libegl", "libx11", "zenity", "pulseaudio", "libcurl-compat", "unzip"])
+    }
 
-        list_file = "Lista dependencias.txt"
-        if not os.path.exists(list_file):
-            app.after(0, lambda: messagebox.showerror("Error", f"No se encontró '{list_file}'"))
-            app.after(0, prog.destroy)
-            return
-
-        manager, check_cmd, install_cmd = (
-            ("APT", ["dpkg", "-s"], "apt install -y") if shutil.which("apt") else
-            ("DNF", ["rpm", "-q"], "dnf install -y") if shutil.which("dnf") else
-            ("PACMAN", ["pacman", "-Q"], "pacman -S --noconfirm --needed") if shutil.which("pacman") else
-            (None, None, None)
-        )
-        if not manager:
-            app.after(0, lambda: messagebox.showerror("Error", "Gestor de paquetes no soportado."))
-            app.after(0, prog.destroy)
-            return
-
-        try:
-            with open(list_file, "r") as f:
-                content = f.read()
-            if f"{manager}:" in content:
-                raw_list = content.split(f"{manager}:")[1].split("\n\n")[0]
-                raw_list = re.sub(r"sudo .* install", "", raw_list).replace("\\", "").replace("\n", " ")
-                pkg_list = [p.strip() for p in raw_list.split() if p.strip()]
-            else:
-                raise Exception(f"No se encontró lista para {manager}")
-        except Exception as e:
-            app.after(0, lambda: messagebox.showerror("Error", f"Error leyendo lista: {e}"))
-            app.after(0, prog.destroy)
-            return
-
-        app.after(0, lambda: lbl_prog.configure(text=f"Chequeando {len(pkg_list)} paquetes..."))
-        missing = [
-            pkg for pkg in pkg_list
-            if subprocess.call(check_cmd + [pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0
-        ]
-        if missing:
-            app.after(0, lambda: show_result_missing(missing, install_cmd))
-        else:
-            app.after(0, lambda: show_result(True, "✅ Requisitos instalados correctamente."))
+    manager, check_cmd, install_cmd, pkg_list = (None, None, None, [])
+    if shutil.which("apt"):
+        manager, (check_cmd, install_cmd, pkg_list) = "APT", dependency_map["APT"]
+    elif shutil.which("dnf"):
+        manager, (check_cmd, install_cmd, pkg_list) = "DNF", dependency_map["DNF"]
+    elif shutil.which("pacman"):
+        manager, (check_cmd, install_cmd, pkg_list) = "PACMAN", dependency_map["PACMAN"]
+    else:
+        messagebox.showerror(c.UI_ERROR_TITLE, c.UI_PKG_MANAGER_NOT_SUPPORTED)
+        return
 
     prog = ctk.CTkToplevel(app)
     prog.title("Verificando...")
@@ -865,39 +574,66 @@ def verify_dependencies(app):
     bar.pack(pady=10, padx=20, fill="x")
     bar.start()
 
-    def show_result(success, text):
+    def show_result(text):
         prog.destroy()
         d = ctk.CTkToplevel(app)
         d.title("Resultado")
         d.geometry("400x300")
+        d.transient(app)
         ctk.CTkLabel(d, text="Resultado de Verificación", font=ctk.CTkFont(weight="bold")).pack(pady=10)
         t = ctk.CTkTextbox(d, wrap="word")
         t.pack(fill="both", expand=True, padx=10, pady=5)
         t.insert("1.0", text)
-        ctk.CTkButton(d, text="Cerrar", command=d.destroy).pack(pady=10)
+        ctk.CTkButton(d, text=c.UI_BUTTON_CLOSE, command=d.destroy).pack(pady=10)
+        d.grab_set()
 
-    def show_result_missing(missing_list, install_cmd):
+    def show_result_missing(missing_list):
         prog.destroy()
         d = ctk.CTkToplevel(app)
-        d.title("Faltan Dependencias")
+        d.title(c.UI_MISSING_DEPS_TITLE)
         d.geometry("500x400")
-        ctk.CTkLabel(d, text="❌ Paquetes Faltantes", text_color="red", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        d.transient(app)
+        ctk.CTkLabel(d, text=c.UI_MISSING_DEPS_MSG, text_color="red", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         t = ctk.CTkTextbox(d)
         t.pack(fill="both", expand=True, padx=10, pady=5)
         t.insert("1.0", "\n".join(missing_list))
 
         def install():
             full_cmd = f"pkexec {install_cmd} {' '.join(missing_list)}"
-            if messagebox.askyesno("Instalar", f"Se intentará ejecutar:\n{full_cmd}\n\n¿Continuar?"):
-                terms = ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "xterm"]
-                term = next((t for t in terms if shutil.which(t)), None)
+            if messagebox.askyesno(c.UI_INFO_TITLE, c.UI_INSTALL_PROMPT.format(full_cmd=full_cmd)):
+                term = next((t for t in ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "xterm"] if shutil.which(t)), None)
                 if term:
                     bash_cmd = f"{full_cmd}; echo; read -p 'Presiona Enter para cerrar...'"
                     subprocess.Popen([term, "-e", f'bash -c "{bash_cmd}"'])
                 else:
-                    messagebox.showerror("Error", "No se encontró terminal compatible.")
+                    messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_COMPATIBLE_TERMINAL)
                 d.destroy()
-        ctk.CTkButton(d, text="Instalar (Root)", fg_color="orange", command=install).pack(pady=10)
+        ctk.CTkButton(d, text=c.UI_BUTTON_INSTALL_ROOT, fg_color="orange", command=install).pack(pady=10)
+        d.grab_set()
+
+    def run_check():
+        if app.is_flatpak:
+            try:
+                if not shutil.which("flatpak"): raise Exception("Comando 'flatpak' no encontrado.")
+                if not hasattr(app, "flatpak_list_cache") or app.flatpak_list_cache is None:
+                    app.after(0, lambda: lbl_prog.configure(text="Consultando paquetes Flatpak..."))
+                    app.flatpak_list_cache = subprocess.check_output(["flatpak", "list", "--app"], text=True)
+                res = app.flatpak_list_cache
+                flatpak_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.DEFAULT_FLATPAK_ID)
+                if flatpak_id not in res:
+                    app.after(0, lambda: show_result(c.UI_FLATPAK_APP_NOT_FOUND.format(flatpak_id=flatpak_id)))
+                else:
+                    app.after(0, lambda: show_result(c.UI_DEPENDENCIES_FLATPAK_OK.format(flatpak_id=flatpak_id)))
+            except Exception as e:
+                app.after(0, lambda: show_result(c.UI_FLATPAK_VERIFICATION_ERROR.format(e=e)))
+            return
+
+        app.after(0, lambda: lbl_prog.configure(text=f"Chequeando {len(pkg_list)} paquetes..."))
+        missing = [pkg for pkg in pkg_list if subprocess.call(check_cmd + [pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0]
+        if missing:
+            app.after(0, lambda: show_result_missing(missing))
+        else:
+            app.after(0, lambda: show_result(c.UI_DEPENDENCIES_OK))
 
     threading.Thread(target=run_check).start()
 
@@ -915,51 +651,45 @@ def check_requirements_dialog(app):
         cpu_flags = []
         try:
             with open("/proc/cpuinfo", "r") as f:
-                cpu_content = f.read()
-            m = re.search(r"flags\s*:\s*(.*)", cpu_content)
-            if m:
-                cpu_flags = m.group(1).split()
-        except:
-            pass
+                m = re.search(r"flags\s*:\s*(.*)", f.read())
+            if m: cpu_flags = m.group(1).split()
+        except: pass
 
-        has_ssse3 = "ssse3" in cpu_flags
-        has_sse4_1 = "sse4_1" in cpu_flags
-        has_sse4_2 = "sse4_2" in cpu_flags
-        has_popcnt = "popcnt" in cpu_flags
-
+        has_sse = all(flag in cpu_flags for flag in ["ssse3", "sse4_1", "sse4_2", "popcnt"])
         gl_ver, gl_es_3, gl_es_2, gl_es_31 = "Desconocido", False, False, False
         try:
             output = subprocess.check_output("glxinfo | grep 'OpenGL ES profile version'", shell=True, text=True)
             gl_ver = output.strip()
             gl_es_3 = any(v in gl_ver for v in ["3.0", "3.1", "3.2", "3.3"])
-            gl_es_31 = any(v in gl_ver for v in ["3.1", "3.2"])
+            gl_es_31 = "3.1" in gl_ver or "3.2" in gl_ver
             gl_es_2 = "2.0" in gl_ver
         except:
             gl_ver = "No detectado (falta glxinfo?)"
 
         compat_ver = "Incompatible"
-        if arch == "x86_64" and has_ssse3 and has_sse4_1 and has_sse4_2 and has_popcnt:
+        if arch == "x86_64" and has_sse:
             if gl_es_31: compat_ver = "1.13.0 - 1.21.130+"
             elif gl_es_3: compat_ver = "1.13.0 - 1.21.124"
             elif gl_es_2: compat_ver = "1.13.0 - 1.20.20"
 
         res_text = (f"Arquitectura: {arch}\n"
-                    f"Extensiones CPU: {'✅' if all([has_ssse3, has_sse4_1, has_sse4_2, has_popcnt]) else '⚠️'}\n"
+                    f"Extensiones CPU: {'✅' if has_sse else '⚠️'}\n"
                     f"OpenGL ES: {gl_ver}\n\n"
-                    f"VERSIÓN RECOMENDADA MCPE:\n{compat_ver}")
-
+                    f"{c.UI_HARDWARE_ANALYSIS_RECOMMENDATION.format(compat_ver=compat_ver)}")
         app.after(0, lambda: show_dialog(res_text))
 
     def show_dialog(text):
         prog.destroy()
         dial = ctk.CTkToplevel(app)
-        dial.title("Verificador de Requisitos")
+        dial.title(c.UI_HARDWARE_ANALYSIS_TITLE)
         dial.geometry("550x400")
-        ctk.CTkLabel(dial, text="Análisis de Hardware", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        dial.transient(app)
+        ctk.CTkLabel(dial, text=c.UI_HARDWARE_ANALYSIS_HEADER, font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         txt_res = ctk.CTkTextbox(dial, font=ctk.CTkFont(family="Courier", size=12), wrap="none")
         txt_res.pack(fill="both", expand=True, padx=20, pady=10)
         txt_res.insert("1.0", text)
         txt_res.configure(state="disabled")
-        ctk.CTkButton(dial, text="Cerrar", command=dial.destroy).pack(pady=10)
+        ctk.CTkButton(dial, text=c.UI_BUTTON_CLOSE, command=dial.destroy).pack(pady=10)
+        dial.grab_set()
 
     threading.Thread(target=run_analysis).start()

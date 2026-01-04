@@ -6,12 +6,16 @@ import tempfile
 import zipfile
 import json
 import uuid
+from src.utils.dialogs import ask_open_filenames_native
 
 class SkinPackTool(ctk.CTkToplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Creador de Skin Packs")
         self.geometry("700x550")
+
+        self.transient(parent)
+        self.grab_set()
 
         self.skins = []
 
@@ -43,7 +47,7 @@ class SkinPackTool(ctk.CTkToplevel):
         ).pack(side="right", padx=5)
 
     def add_skins_multi(self):
-        file_paths = filedialog.askopenfilenames(filetypes=[("Imágenes PNG", "*.png")])
+        file_paths = ask_open_filenames_native(self, filetypes=[("Imágenes PNG", "*.png")])
         if file_paths:
             for path in file_paths:
                 # Auto-nombre basado en archivo

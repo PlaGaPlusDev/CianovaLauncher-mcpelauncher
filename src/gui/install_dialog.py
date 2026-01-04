@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox
 import os
 import platform
 import zipfile
+from src.utils.dialogs import ask_open_filename_native
 
 class InstallDialog(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -11,7 +12,8 @@ class InstallDialog(ctk.CTkToplevel):
         self.title("Instalar Nueva Versión")
         self.geometry("500x450")  # Un poco más alto para el mensaje de error
         self.resizable(False, False)
-        self.attributes("-topmost", True)
+
+        self.transient(parent)
 
         # Variables
         self.apk_path = ctk.StringVar()
@@ -143,14 +145,15 @@ class InstallDialog(ctk.CTkToplevel):
         )
         self.btn_install.pack(pady=20, padx=40, fill="x")
 
-        # Centrar
+        # Centrar y hacer modal
         self.update_idletasks()
         x = parent.winfo_x() + (parent.winfo_width() // 2) - (self.winfo_width() // 2)
         y = parent.winfo_y() + (parent.winfo_height() // 2) - (self.winfo_height() // 2)
         self.geometry(f"+{x}+{y}")
+        self.grab_set()
 
     def browse_apk(self):
-        path = filedialog.askopenfilename(filetypes=[("Archivos APK", "*.apk")])
+        path = ask_open_filename_native(self, title="Seleccionar archivo APK", filetypes=[("Archivos APK", "*.apk")])
         if path:
             self.apk_path.set(path)
             # Intentar adivinar versión

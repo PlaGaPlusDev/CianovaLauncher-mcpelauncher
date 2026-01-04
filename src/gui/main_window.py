@@ -3,8 +3,10 @@ from tkinter import messagebox
 import os
 import sys
 from PIL import Image, ImageTk
+import subprocess
 
-from src.constants import VERSION_LAUNCHER, CREDITOS
+from src import constants as c
+from src.utils.dialogs import ask_open_filename_native
 from src.utils.resource_path import resource_path
 from src.core.config_manager import ConfigManager
 from src.gui.install_dialog import InstallDialog
@@ -22,7 +24,7 @@ class CianovaLauncherApp(ctk.CTk):
         # ==========================================
         # 1. RUTAS Y DETECCIÓN (MOVIDO AL INICIO)
         # ==========================================
-        self.home = os.path.expanduser("~")
+        self.home = c.HOME_DIR
 
         # Detectar si estamos en Flatpak
         self.running_in_flatpak = self.logic.is_running_in_flatpak()
@@ -41,25 +43,23 @@ class CianovaLauncherApp(ctk.CTk):
         if self.running_in_flatpak:
             # Dentro de Flatpak, usar nuestra propia ruta de datos
             # Fallback si ID es None (puede pasar si no lee .flatpak-info bien)
-            app_id = (
-                self.our_flatpak_id if self.our_flatpak_id else "org.cianova.Launcher"
-            )
+            app_id = self.our_flatpak_id if self.our_flatpak_id else c.DEFAULT_FLATPAK_ID
             print(f"DEBUG: Using App ID: {app_id}")
             self.our_data_path = os.path.join(
-                self.home, f".var/app/{app_id}/data/mcpelauncher"
+                self.home, f"{c.FLATPAK_DATA_DIR}/{app_id}/{c.MCPELAUNCHER_DATA_SUBDIR}"
             )
             self.compiled_path = (
                 self.our_data_path
             )  # En Flatpak, "compilado" es nuestros datos
             self.flatpak_path = os.path.join(
-                self.home, ".var/app/com.mcpelauncher.MCPELauncher/data/mcpelauncher"
+                self.home, f"{c.FLATPAK_DATA_DIR}/{c.MCPELAUNCHER_FLATPAK_ID}/{c.MCPELAUNCHER_DATA_SUBDIR}"
             )
         else:
             # Ejecución normal
             self.flatpak_path = os.path.join(
-                self.home, ".var/app/com.mcpelauncher.MCPELauncher/data/mcpelauncher"
+                self.home, f"{c.FLATPAK_DATA_DIR}/{c.MCPELAUNCHER_FLATPAK_ID}/{c.MCPELAUNCHER_DATA_SUBDIR}"
             )
-            self.compiled_path = os.path.join(self.home, ".local/share/mcpelauncher")
+            self.compiled_path = os.path.join(self.home, c.LOCAL_SHARE_DIR)
 
         print(f"DEBUG: Data Path: {self.compiled_path}")
         self.active_path = None
@@ -72,21 +72,19 @@ class CianovaLauncherApp(ctk.CTk):
         # Configurar rutas de config según contexto
         if self.running_in_flatpak:
             # En Flatpak: guardar en /data/ directamente, NO en /data/mcpelauncher/
-            app_id = (
-                self.our_flatpak_id if self.our_flatpak_id else "org.cianova.Launcher"
-            )
-            data_dir = os.path.join(self.home, f".var/app/{app_id}/data")
-            config_path = os.path.join(data_dir, "cianovalauncher-config.json")
+            app_id = self.our_flatpak_id if self.our_flatpak_id else c.DEFAULT_FLATPAK_ID
+            data_dir = os.path.join(self.home, f"{c.FLATPAK_DATA_DIR}/{app_id}/data")
+            config_path = os.path.join(data_dir, c.CONFIG_FILE_NAME)
             old_config_path = os.path.join(
-                self.compiled_path, "config.json"
+                self.compiled_path, c.OLD_CONFIG_FILE_NAME
             )  # Ruta antigua para migración
         else:
             # En local: guardar en .local/share/mcpelauncher/
             config_path = os.path.join(
-                self.compiled_path, "cianovalauncher-config.json"
+                self.compiled_path, c.CONFIG_FILE_NAME
             )
             old_config_path = os.path.join(
-                self.compiled_path, "config.json"
+                self.compiled_path, c.OLD_CONFIG_FILE_NAME
             )  # Ruta antigua para migración
 
         print(f"DEBUG: Config Path: {config_path}")
@@ -99,16 +97,16 @@ class CianovaLauncherApp(ctk.CTk):
 
         # Aplicar Tema de Configuración
         try:
-            ctk.set_appearance_mode(self.config.get("appearance_mode", "Dark"))
-            ctk.set_default_color_theme(self.config.get("color_theme", "blue"))
+            ctk.set_appearance_mode(self.config.get(c.CONFIG_KEY_APPEARANCE, "Dark"))
+            ctk.set_default_color_theme(self.config.get(c.CONFIG_KEY_COLOR_THEME, "blue"))
         except Exception as e:
             print(f"Error aplicando tema: {e}")
 
         # ==========================================
         # 3. WINDOW SETUP & ICON
         # ==========================================
-        self.title(f"CianovaLauncherMCPE - v{VERSION_LAUNCHER}")
-        self.geometry(self.config.get("window_size", "700x550"))
+        self.title(c.UI_TITLE_VERSION)
+        self.geometry(self.config.get(c.CONFIG_KEY_WINDOW_SIZE, "700x550"))
         self.bind("<Configure>", self.save_window_size)
 
         self.app_icon_image = None
@@ -145,10 +143,10 @@ class CianovaLauncherApp(ctk.CTk):
         self.tabview = ctk.CTkTabview(self, corner_radius=15)
         self.tabview.grid(row=0, column=0, padx=15, pady=15, sticky="nsew")
 
-        self.tab_launcher = self.tabview.add(" JUGAR ")
-        self.tab_tools = self.tabview.add(" HERRAMIENTAS ")
-        self.tab_settings = self.tabview.add(" AJUSTES ")
-        self.tab_about = self.tabview.add(" ACERCA DE ")
+        self.tab_launcher = self.tabview.add(c.UI_TAB_PLAY)
+        self.tab_tools = self.tabview.add(c.UI_TAB_TOOLS)
+        self.tab_settings = self.tabview.add(c.UI_TAB_SETTINGS)
+        self.tab_about = self.tabview.add(c.UI_TAB_ABOUT)
 
         # Inicializar Componentes
         self.setup_launcher_tab()
@@ -179,8 +177,8 @@ class CianovaLauncherApp(ctk.CTk):
         # Guardar geometría solo si es un evento de la ventana principal
         if event and event.widget == self:
             size = self.geometry().split("+")[0]  # Obtener solo WxH
-            if size != self.config.get("window_size"):
-                self.config_manager.set("window_size", size)
+            if size != self.config.get(c.CONFIG_KEY_WINDOW_SIZE):
+                self.config_manager.set(c.CONFIG_KEY_WINDOW_SIZE, size)
 
     # ==========================================
     # PESTAÑA 1: LANZADOR (MINIMALISTA)
@@ -195,22 +193,16 @@ class CianovaLauncherApp(ctk.CTk):
 
         self.lbl_status = ctk.CTkLabel(
             self.frame_header,
-            text="● Buscando...",
+            text=c.UI_LABEL_SEARCHING,
             font=ctk.CTkFont(size=13, weight="bold"),
         )
         self.lbl_status.pack(side="left", padx=10)
 
         # Selector de modo con opciones según contexto
         if self.running_in_flatpak:
-            # Dentro de Flatpak: Mostrar Local (Propio), Local (Compartido) y Flatpak (Personalizado)
-            mode_values = [
-                "Local (Propio)",
-                "Local (Compartido)",
-                "Flatpak (Personalizado)",
-            ]
+            mode_values = c.UI_MODE_VALUES_FLATPAK
         else:
-            # Fuera de Flatpak: Mostrar Local y Flatpak (Personalizado)
-            mode_values = ["Local", "Flatpak (Personalizado)"]
+            mode_values = c.UI_MODE_VALUES_NORMAL
 
         self.combo_mode = ctk.CTkComboBox(
             self.frame_header,
@@ -223,14 +215,14 @@ class CianovaLauncherApp(ctk.CTk):
         self.combo_mode.pack(side="right", padx=10)
         ctk.CTkLabel(
             self.frame_header,
-            text="Instalación:",
+            text=c.UI_LABEL_INSTALLATION,
             text_color="gray",
             font=ctk.CTkFont(size=12),
         ).pack(side="right", padx=5)
 
         # Lista (Card Style)
         self.version_listbox = ctk.CTkScrollableFrame(
-            self.tab_launcher, label_text="Versiones Instaladas", corner_radius=12
+            self.tab_launcher, label_text=c.UI_LABEL_INSTALLED_VERSIONS, corner_radius=12
         )
         self.version_listbox.grid(row=2, column=0, padx=15, pady=5, sticky="nsew")
         self.version_var = ctk.StringVar(value="")
@@ -240,21 +232,21 @@ class CianovaLauncherApp(ctk.CTk):
         self.frame_launch_opts.grid(row=3, column=0, pady=5)
 
         self.var_close_on_launch = ctk.BooleanVar(
-            value=self.config.get("close_on_launch", False)
+            value=self.config.get(c.CONFIG_KEY_CLOSE_ON_LAUNCH, False)
         )
         self.check_close_on_launch = ctk.CTkCheckBox(
             self.frame_launch_opts,
-            text="Cerrar al jugar",
+            text=c.UI_CHECKBOX_CLOSE_ON_LAUNCH,
             variable=self.var_close_on_launch,
             corner_radius=15,
             font=ctk.CTkFont(size=12),
         )
         self.check_close_on_launch.pack(side="left", padx=10)
 
-        self.var_debug_log = ctk.BooleanVar(value=self.config.get("debug_log", False))
+        self.var_debug_log = ctk.BooleanVar(value=self.config.get(c.CONFIG_KEY_DEBUG_LOG, False))
         self.check_debug_log = ctk.CTkCheckBox(
             self.frame_launch_opts,
-            text="Ver Log (Terminal)",
+            text=c.UI_CHECKBOX_DEBUG_LOG,
             variable=self.var_debug_log,
             corner_radius=15,
             font=ctk.CTkFont(size=12),
@@ -264,12 +256,12 @@ class CianovaLauncherApp(ctk.CTk):
         # Botón
         self.btn_launch = ctk.CTkButton(
             self.tab_launcher,
-            text="JUGAR AHORA",
+            text=c.UI_BUTTON_PLAY_NOW,
             height=50,
             corner_radius=15,
             font=ctk.CTkFont(size=20, weight="bold"),
-            fg_color="#2cc96b",
-            hover_color="#229e54",
+            fg_color=c.COLOR_PRIMARY_GREEN,
+            hover_color=c.COLOR_PRIMARY_GREEN_HOVER,
             command=lambda: self.logic.launch_game(self),
         )
         self.btn_launch.grid(row=4, column=0, padx=30, pady=15, sticky="ew")
@@ -301,34 +293,34 @@ class CianovaLauncherApp(ctk.CTk):
         frame_install.pack(fill="x", pady=(0, 10))
 
         ctk.CTkLabel(
-            frame_install, text="Gestión", font=ctk.CTkFont(size=14, weight="bold")
+            frame_install, text=c.UI_SECTION_MANAGEMENT, font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(10, 2))
         ctk.CTkButton(
             frame_install,
-            text="Instalar APK",
+            text=c.UI_BUTTON_INSTALL_APK,
             height=32,
             corner_radius=8,
-            fg_color=("#1f6aa5", "#1f6aa5"),
+            fg_color=c.COLOR_BLUE_BUTTON,
             command=self.install_apk_dialog,
         ).pack(pady=5, padx=15, fill="x")
         ctk.CTkButton(
             frame_install,
-            text="Mover/Borrar Versión",
+            text=c.UI_BUTTON_MOVE_DELETE_VERSION,
             height=32,
             corner_radius=8,
-            fg_color="#e63946",
-            hover_color="#c92a35",
+            fg_color=c.COLOR_RED_BUTTON,
+            hover_color=c.COLOR_RED_BUTTON_HOVER,
             command=lambda: self.logic.delete_version_dialog(self),
         ).pack(pady=5, padx=15, fill="x")
 
         # Botón de migración (especialmente útil en Flatpak)
         ctk.CTkButton(
             frame_install,
-            text="Migración de Datos",
+            text=c.UI_BUTTON_MIGRATE_DATA,
             height=32,
             corner_radius=8,
-            fg_color="#8e44ad",
-            hover_color="#732d91",
+            fg_color=c.COLOR_PURPLE_BUTTON,
+            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
             command=self.open_migration_tool,
         ).pack(pady=5, padx=15, fill="x")
 
@@ -338,29 +330,29 @@ class CianovaLauncherApp(ctk.CTk):
 
         ctk.CTkLabel(
             frame_custom,
-            text="Personalización",
+            text=c.UI_SECTION_CUSTOMIZATION,
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(pady=10)
         ctk.CTkButton(
             frame_custom,
-            text="Creador de Skin Packs",
+            text=c.UI_BUTTON_SKIN_PACK_CREATOR,
             height=32,
             corner_radius=8,
-            fg_color=("#1f6aa5", "#1f6aa5"),
+            fg_color=c.COLOR_BLUE_BUTTON,
             command=self.open_skin_tool,
         ).pack(pady=5, padx=15, fill="x")
 
         self.lbl_shader_status = ctk.CTkLabel(
-            frame_custom, text="Shaders: ...", font=ctk.CTkFont(size=11)
+            frame_custom, text=c.UI_LABEL_SHADERS_STATUS, font=ctk.CTkFont(size=11)
         )
         self.lbl_shader_status.pack(pady=(5, 0))
         ctk.CTkButton(
             frame_custom,
-            text="Fix Shaders",
+            text=c.UI_BUTTON_FIX_SHADERS,
             height=32,
             corner_radius=8,
-            fg_color=("#e09600", "#fca311"),
-            hover_color=("#c58200", "#d68c0e"),
+            fg_color=c.COLOR_YELLOW_BUTTON,
+            hover_color=c.COLOR_YELLOW_BUTTON_HOVER,
             command=lambda: self.logic.disable_shaders(self),
         ).pack(pady=5, padx=15, fill="x")
 
@@ -369,15 +361,15 @@ class CianovaLauncherApp(ctk.CTk):
         frame_files.pack(fill="x", pady=10)
 
         ctk.CTkLabel(
-            frame_files, text="Archivos", font=ctk.CTkFont(size=14, weight="bold")
+            frame_files, text=c.UI_SECTION_FILES, font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(15, 5))
         ctk.CTkButton(
             frame_files,
-            text="Abrir Carpeta de Datos",
+            text=c.UI_BUTTON_OPEN_DATA_FOLDER,
             height=32,
             corner_radius=8,
-            fg_color=("#36607c", "#457b9d"),
-            hover_color=("#2a4d63", "#36607c"),
+            fg_color=c.COLOR_GRAY_BUTTON,
+            hover_color=c.COLOR_GRAY_BUTTON_HOVER,
             command=lambda: self.logic.open_data_folder(self),
         ).pack(pady=5, padx=15, fill="x")
 
@@ -390,25 +382,25 @@ class CianovaLauncherApp(ctk.CTk):
         frame_sys.pack(fill="x", pady=(0, 10))
 
         ctk.CTkLabel(
-            frame_sys, text="Sistema", font=ctk.CTkFont(size=14, weight="bold")
+            frame_sys, text=c.UI_SECTION_SYSTEM, font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(15, 5))
         self.btn_verify_deps = ctk.CTkButton(
             frame_sys,
-            text="Verificar Dependencias",
+            text=c.UI_BUTTON_VERIFY_DEPS,
             height=32,
             corner_radius=8,
-            fg_color=("#6d28c9", "#8338ec"),
-            hover_color=("#5a1fad", "#6d23d9"),
+            fg_color=c.COLOR_PURPLE_BUTTON,
+            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
             command=lambda: self.logic.verify_dependencies(self),
         )
         self.btn_verify_deps.pack(pady=5, padx=20, fill="x")
         ctk.CTkButton(
             frame_sys,
-            text="Verificar Requisitos (Hardware)",
+            text=c.UI_BUTTON_VERIFY_HW,
             height=32,
             corner_radius=8,
-            fg_color=("#8e44ad", "#9b59b6"),
-            hover_color=("#732d91", "#8e44ad"),
+            fg_color=c.COLOR_PURPLE_BUTTON,
+            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
             command=lambda: self.logic.check_requirements_dialog(self),
         ).pack(pady=5, padx=20, fill="x")
 
@@ -418,16 +410,16 @@ class CianovaLauncherApp(ctk.CTk):
 
         ctk.CTkLabel(
             frame_shortcut,
-            text="Menú de Inicio",
+            text=c.UI_SECTION_SHORTCUT,
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(pady=(15, 5))
         ctk.CTkButton(
             frame_shortcut,
-            text="Gestionar Acceso Directo",
+            text=c.UI_BUTTON_MANAGE_SHORTCUT,
             height=32,
             corner_radius=8,
-            fg_color=("#16a34a", "#16a34a"),
-            hover_color=("#15803d", "#15803d"),
+            fg_color=c.COLOR_GREEN_BUTTON,
+            hover_color=c.COLOR_GREEN_BUTTON_HOVER,
             command=self.manage_desktop_shortcut,
         ).pack(pady=5, padx=20, fill="x")
 
@@ -436,22 +428,22 @@ class CianovaLauncherApp(ctk.CTk):
         frame_export.pack(fill="x", pady=10)
 
         ctk.CTkLabel(
-            frame_export, text="Exportación", font=ctk.CTkFont(size=14, weight="bold")
+            frame_export, text=c.UI_SECTION_EXPORT, font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(15, 5))
         ctk.CTkButton(
             frame_export,
-            text="Exportar Mundos",
+            text=c.UI_BUTTON_EXPORT_WORLDS,
             height=32,
             corner_radius=8,
-            fg_color=("#1f6aa5", "#1f6aa5"),
+            fg_color=c.COLOR_BLUE_BUTTON,
             command=lambda: self.logic.export_worlds_dialog(self),
         ).pack(pady=5, padx=20, fill="x")
         ctk.CTkButton(
             frame_export,
-            text="Abrir Capturas",
+            text=c.UI_BUTTON_OPEN_SCREENSHOTS,
             height=32,
             corner_radius=8,
-            fg_color=("#1f6aa5", "#1f6aa5"),
+            fg_color=c.COLOR_BLUE_BUTTON,
             command=lambda: self.logic.export_screenshots_dialog(self),
         ).pack(pady=5, padx=20, fill="x")
 
@@ -459,7 +451,7 @@ class CianovaLauncherApp(ctk.CTk):
         frame_credits = ctk.CTkFrame(self.scroll_tools, fg_color="transparent")
         frame_credits.grid(row=2, column=0, columnspan=2, pady=5)
         ctk.CTkLabel(
-            frame_credits, text=CREDITOS, text_color="gray", font=ctk.CTkFont(size=10)
+            frame_credits, text=c.CREDITOS, text_color="gray", font=ctk.CTkFont(size=10)
         ).pack()
 
     # ==========================================
@@ -478,45 +470,41 @@ class CianovaLauncherApp(ctk.CTk):
 
         ctk.CTkLabel(
             self.frame_bin,
-            text="Rutas de Binarios",
+            text=c.UI_SECTION_BINARIES,
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(pady=10)
 
         # Selector de Modo
-        modes = ["Sistema (Instalado)", "Personalizado"]
-
-        # Agregar "Local (Junto al script)" solo si NO estamos en Flatpak
         if not self.running_in_flatpak:
-            modes.insert(1, "Local (Junto al script)")
-
-        # Agregar siempre Flatpak Personalizado para conectar con otros Flatpaks
-        modes.append("Flatpak (Personalizado)")
+            modes = c.UI_MODES_SETTINGS_NORMAL
+        else:
+            modes = c.UI_MODES_SETTINGS_FLATPAK
 
         self.combo_settings_mode = ctk.CTkComboBox(
             self.frame_bin,
             values=modes,
-            command=self.on_settings_mode_change,  # Kept original function name for consistency
+            command=self.on_settings_mode_change,
             width=250,
         )
         self.combo_settings_mode.pack(pady=(0, 15))
-        self.combo_settings_mode.set(self.config.get("mode", "Sistema (Instalado)"))
+        self.combo_settings_mode.set(self.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
 
         # Flatpak Selector (Solo visible si es Flatpak)
         self.frame_flatpak_id = ctk.CTkFrame(self.frame_bin, fg_color="transparent")
         ctk.CTkLabel(
-            self.frame_flatpak_id, text="ID de App Flatpak:", width=150, anchor="w"
+            self.frame_flatpak_id, text=c.UI_LABEL_FLATPAK_ID, width=150, anchor="w"
         ).pack(side="left")
         self.entry_flatpak_id = ctk.CTkEntry(self.frame_flatpak_id)
         self.entry_flatpak_id.pack(side="left", fill="x", expand=True)
         self.entry_flatpak_id.insert(
-            0, self.config.get("flatpak_app_id", "com.mcpelauncher.MCPELauncher")
+            0, self.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
         )
         self.btn_flatpak_custom = ctk.CTkButton(
             self.frame_flatpak_id,
             text="?",
             width=30,
             command=lambda: messagebox.showinfo(
-                "Info", "Escribe el ID del Flatpak, ej: org.mcpelauncher.Other"
+                c.UI_INFO_TITLE, c.UI_FLATPAK_ID_EXAMPLE
             ),
         )
         self.btn_flatpak_custom.pack(side="right", padx=5)
@@ -528,10 +516,10 @@ class CianovaLauncherApp(ctk.CTk):
             ctk.CTkLabel(f, text=label, width=150, anchor="w").pack(side="left")
             entry = ctk.CTkEntry(f)
             entry.pack(side="left", fill="x", expand=True, padx=5)
-            entry.insert(0, self.config["binary_paths"].get(key, ""))
+            entry.insert(0, self.config[c.CONFIG_KEY_BINARY_PATHS].get(key, ""))
 
             def browse():
-                path = filedialog.askopenfilename(filetypes=file_types)
+                path = ask_open_filename_native(self, title=f"Seleccionar {label}", filetypes=file_types)
                 if path:
                     entry.delete(0, "end")
                     entry.insert(0, path)
@@ -542,16 +530,16 @@ class CianovaLauncherApp(ctk.CTk):
 
         # Inputs
         self.entry_client, self.btn_client, self.f_client = create_path_input(
-            self.frame_bin, "Cliente (game):", "client", [("Ejecutable", "*")]
+            self.frame_bin, "Cliente (game):", c.CONFIG_KEY_CLIENT, [("Ejecutable", "*")]
         )
         self.entry_extract, self.btn_extract, self.f_extract = create_path_input(
-            self.frame_bin, "Extractor APK:", "extract", [("Ejecutable", "*")]
+            self.frame_bin, "Extractor APK:", c.CONFIG_KEY_EXTRACT, [("Ejecutable", "*")]
         )
         self.entry_webview, self.btn_webview, self.f_webview = create_path_input(
-            self.frame_bin, "Webview (Opcional):", "webview", [("Ejecutable", "*")]
+            self.frame_bin, "Webview (Opcional):", c.CONFIG_KEY_WEBVIEW, [("Ejecutable", "*")]
         )
         self.entry_error, self.btn_error, self.f_error = create_path_input(
-            self.frame_bin, "Error Handler (Opcional):", "error", [("Ejecutable", "*")]
+            self.frame_bin, "Error Handler (Opcional):", c.CONFIG_KEY_ERROR, [("Ejecutable", "*")]
         )
 
         # Botones de Acción
@@ -560,9 +548,9 @@ class CianovaLauncherApp(ctk.CTk):
 
         ctk.CTkButton(
             frame_actions,
-            text="Guardar Configuración",
-            fg_color="#2cc96b",
-            hover_color="#229e54",
+            text=c.UI_BUTTON_SAVE_SETTINGS,
+            fg_color=c.COLOR_PRIMARY_GREEN,
+            hover_color=c.COLOR_PRIMARY_GREEN_HOVER,
             command=self.save_settings,
         ).pack(side="left", padx=10)
 
@@ -572,7 +560,7 @@ class CianovaLauncherApp(ctk.CTk):
 
         ctk.CTkLabel(
             frame_appearance,
-            text="Apariencia",
+            text=c.UI_SECTION_APPEARANCE,
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(pady=10)
 
@@ -580,18 +568,18 @@ class CianovaLauncherApp(ctk.CTk):
         f_theme.pack(pady=5)
 
         # Solo Color Principal (eliminamos Light/Dark/System)
-        ctk.CTkLabel(f_theme, text="Tema de Color:").pack(side="left", padx=5)
+        ctk.CTkLabel(f_theme, text=c.UI_LABEL_COLOR_THEME).pack(side="left", padx=5)
         self.option_color = ctk.CTkOptionMenu(
             f_theme,
-            values=["blue", "green", "dark-blue"],
-            command=lambda c: self.change_appearance("color", c),
+            values=c.UI_COLOR_THEMES,
+            command=lambda color: self.change_appearance("color", color),
         )
         self.option_color.pack(side="left", padx=10)
-        self.option_color.set(self.config.get("color_theme", "blue"))
+        self.option_color.set(self.config.get(c.CONFIG_KEY_COLOR_THEME, "blue"))
 
         ctk.CTkLabel(
             frame_appearance,
-            text="* El cambio de color requiere reiniciar la aplicación.",
+            text=c.UI_RESTART_REQUIRED_MSG,
             text_color="gray",
             font=ctk.CTkFont(size=10),
         ).pack(pady=5)
@@ -634,22 +622,20 @@ class CianovaLauncherApp(ctk.CTk):
 
     def save_settings(self):
         mode = self.combo_settings_mode.get()
-        self.config["mode"] = mode
-        self.config["flatpak_app_id"] = self.entry_flatpak_id.get()
-
-        # 3. Solo guardar paths si es personalizado (opcional)
+        self.config[c.CONFIG_KEY_MODE] = mode
+        self.config[c.CONFIG_KEY_FLATPAK_ID] = self.entry_flatpak_id.get()
 
         # Solo guardar paths si es personalizado
         if "Personalizado" in mode:
-            self.config["binary_paths"]["client"] = self.entry_client.get()
-            self.config["binary_paths"]["extract"] = self.entry_extract.get()
-            self.config["binary_paths"]["webview"] = self.entry_webview.get()
-            self.config["binary_paths"]["error"] = self.entry_error.get()
+            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_CLIENT] = self.entry_client.get()
+            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_EXTRACT] = self.entry_extract.get()
+            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_WEBVIEW] = self.entry_webview.get()
+            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_ERROR] = self.entry_error.get()
 
         self.config_manager.save_config()
         messagebox.showinfo(
-            "Guardado",
-            "Configuración guardada.\nSe aplicarán los cambios al detectar instalación.",
+            c.UI_SUCCESS_TITLE,
+            c.UI_SAVE_SUCCESS_MSG,
         )
         self.logic.detect_installation(self)  # Refrescar todo
 
@@ -665,46 +651,9 @@ class CianovaLauncherApp(ctk.CTk):
         )
         frame_legal.pack(fill="both", expand=True, padx=20, pady=10)
 
-        legal_text = """LICENCIA & TÉRMINOS Y CONDICIONES
-
-Última Actualización: 26 de Diciembre de 2025
-
----
-
-1. Naturaleza del Proyecto
-CianovaLauncher es una herramienta de código abierto desarrollada con fines educativos y de utilidad para la comunidad de Minecraft Bedrock en Linux.
-
-* Desarrollo Asistido por IA: Esta herramienta ha sido desarrollada con la asistencia de Google Antigravity, un agente de Inteligencia Artificial avanzado.
-* Base Original: El script original `MCPELauncher Tools ver0.3.sh` es propiedad intelectual del usuario @PlaGaDev, quien lo ha cedido libremente para este proyecto.
-
-2. Atribución y Dependencias
-Este "launcher" solo funciona de forma independiente en su apartado visual pero cualquier opción de ejecución, extracción u otro proceso requiere la instalación previa y binarios compilados de:
-* MCPELauncher-Manifest: Proyecto base en el que se fundamenta (Creditos a ChristopherHX y MCMrARM).
-
-CianovaLauncher no busca reemplazar, competir ni apropiarse del crédito del proyecto mencionado anteriormente ni ningún otro launcher que cumpla su misma función. Su único propósito es facilitar la gestión de versiones y procesos para los usuarios de dicho manifest sin pretender ser el soporte oficial del proyecto.
-
-El proyecto CCMC Launcher por CrowRei34, en el cual se basaba la versión anterior (v1.0, v1.1 y v1.2) de la herramienta MCPETool (Ahora llamada CianovaLauncher) se considera actualmente como obsoleto/legacy. CianovaLauncher busca ofrecer a los usuarios de la versión anterior una nueva forma para los usuarios que usan o usaban dicha estructura.
-
-CianovaLauncher no proporcionará las APKs que se requieren para la ejecución, el usuario debe conseguirlas por sus propios medios.
-
-3. Uso No Lucrativo
-Este proyecto se distribuye bajo la licencia GNU GPL v3.0. Es de código abierto y se entrega con la intención de ser gratuito para siempre. Se agradece a la comunidad no monetizar esta herramienta para mantener el espíritu de colaboración.
-
-4. Exención de Responsabilidad
-El software se proporciona "tal cual", sin garantía de ningún tipo. Los desarrolladores (@PlaGaDev, GoogleAntigravity) no se hacen responsables de:
-* Pérdida de datos (mundos, capturas, etc.).
-* Baneos de cuentas por uso indebido.
-* Fallos en el sistema derivados del uso de la herramienta.
-
-Al utilizar CianovaLauncher, aceptas estos términos y condiciones.
-
----
-Hecho con ❤️ y 🤖 para la comunidad Linux.
-"""
-
         lbl_legal = ctk.CTkLabel(
             frame_legal,
-            text=legal_text,
+            text=c.LEGAL_TEXT,
             justify="left",
             wraplength=500,
             font=ctk.CTkFont(size=11),
@@ -712,33 +661,32 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
         lbl_legal.pack(padx=10, pady=10, anchor="w")
 
         # Créditos
-        ctk.CTkLabel(self.tab_about, text=CREDITOS, font=ctk.CTkFont(size=12)).pack(
+        ctk.CTkLabel(self.tab_about, text=c.CREDITOS, font=ctk.CTkFont(size=12)).pack(
             pady=10
         )
         ctk.CTkLabel(
-            self.tab_about, text=f"Versión: {VERSION_LAUNCHER}", text_color="gray"
+            self.tab_about, text=f"Versión: {c.VERSION_LAUNCHER}", text_color="gray"
         ).pack()
 
     def change_appearance(self, type_change, value):
         if type_change == "color":
-            self.config["color_theme"] = value
+            self.config[c.CONFIG_KEY_COLOR_THEME] = value
             messagebox.showinfo(
-                "Reinicio Requerido",
-                "El cambio de color se aplicará completamente al reiniciar la aplicación.",
+                c.UI_RESTART_REQUIRED_TITLE,
+                c.UI_RESTART_MSG,
             )
 
         self.config_manager.save_config()
 
     def manage_desktop_shortcut(self):
         """Muestra diálogo avanzado para gestionar accesos directos"""
-        # Rutas de búsqueda (Intentar detectar en el host si estamos en Flatpak)
-        desktop_folder = os.path.expanduser("~/.local/share/applications/")
-        main_desktop_file = os.path.join(desktop_folder, "cianova-launcher.desktop")
+        desktop_folder = os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR)
+        main_desktop_file = os.path.join(desktop_folder, c.DESKTOP_SHORTCUT_NAME)
 
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Gestionar Accesos Directos")
+        dialog.title(c.UI_MANAGE_SHORTCUT_TITLE)
         dialog.geometry("500x480")
-        dialog.attributes("-topmost", True)
+        dialog.transient(self)
         dialog.resizable(False, False)
 
         scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
@@ -758,9 +706,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
                         "flatpak-spawn",
                         "--host",
                         "ls",
-                        os.path.expanduser(
-                            "~/.local/share/applications/cianova-launcher.desktop"
-                        ),
+                        os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
                     ],
                     capture_output=True,
                     timeout=1,
@@ -771,9 +717,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
                 pass
 
         status_color = "green" if target_exists else "orange"
-        status_text = (
-            "✓ Activo en Menú de Inicio" if target_exists else "✗ No instalado en Menú"
-        )
+        status_text = c.UI_SHORTCUT_ACTIVE_MSG if target_exists else c.UI_SHORTCUT_INACTIVE_MSG
         ctk.CTkLabel(
             scroll,
             text=status_text,
@@ -791,9 +735,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
                             "flatpak-spawn",
                             "--host",
                             "ls",
-                            os.path.expanduser(
-                                "~/.local/share/applications/cianova-launcher.desktop"
-                            ),
+                            os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
                         ],
                         capture_output=True,
                         timeout=1,
@@ -805,7 +747,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
 
             if exists_now:
                 if messagebox.askyesno(
-                    "Confirmar", "¿Deseas eliminar el acceso directo principal?"
+                    "Confirmar", c.UI_CONFIRM_DELETE_SHORTCUT_MSG
                 ):
                     try:
                         if self.running_in_flatpak:
@@ -814,20 +756,18 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
                                     "flatpak-spawn",
                                     "--host",
                                     "rm",
-                                    os.path.expanduser(
-                                        "~/.local/share/applications/cianova-launcher.desktop"
-                                    ),
+                                    os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
                                 ]
                             )
                         else:
                             os.remove(main_desktop_file)
                         messagebox.showinfo(
-                            "Éxito", "Acceso directo principal eliminado."
+                            c.UI_SUCCESS_TITLE, c.UI_SHORTCUT_DELETED_MSG
                         )
                         dialog.destroy()
                         self.manage_desktop_shortcut()
                     except Exception as e:
-                        messagebox.showerror("Error", str(e))
+                        messagebox.showerror(c.UI_ERROR_TITLE, str(e))
             else:
                 create_shortcut_logic()
 
@@ -837,7 +777,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
                 app_id = (
                     self.our_flatpak_id
                     if self.our_flatpak_id
-                    else "org.cianova.Launcher"
+                    else c.DEFAULT_FLATPAK_ID
                 )
                 exec_cmd = f"flatpak run {app_id}"
             else:
@@ -861,7 +801,7 @@ Hecho con ❤️ y 🤖 para la comunidad Linux.
 
             icon_path = resource_path("icon.png")
             if self.running_in_flatpak:
-                icon_path = "org.cianova.Launcher"
+                icon_path = c.DEFAULT_FLATPAK_ID
 
             desktop_content = f"""[Desktop Entry]
 Name={name}
@@ -878,23 +818,23 @@ Categories=Game;
                 with open(target, "w") as f:
                     f.write(desktop_content)
                 os.chmod(target, 0o755)
-                messagebox.showinfo("Éxito", f"Acceso directo '{name}' creado.")
+                messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_SHORTCUT_CREATED_MSG.format(name=name))
                 dialog.destroy()
                 self.manage_desktop_shortcut()
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo crear: {e}")
+                messagebox.showerror(c.UI_ERROR_TITLE, c.UI_SHORTCUT_CREATION_ERROR_MSG.format(e=e))
 
         ctk.CTkButton(
             scroll,
-            text="Eliminar Principal" if target_exists else "Crear Principal",
-            fg_color="#dc2626" if target_exists else "#16a34a",
+            text=c.UI_BUTTON_DELETE_MAIN if target_exists else c.UI_BUTTON_CREATE_MAIN,
+            fg_color=c.COLOR_RED_BUTTON if target_exists else c.COLOR_GREEN_BUTTON,
             command=toggle_main,
         ).pack(pady=10)
 
         # --- SECCIÓN 2: VERSIONES ESPECÍFICAS ---
         ctk.CTkLabel(
             scroll,
-            text="Accesos Directos por Versión",
+            text=c.UI_SECTION_VERSION_SHORTCUTS,
             font=ctk.CTkFont(size=16, weight="bold"),
         ).pack(pady=(20, 5))
 
@@ -914,13 +854,13 @@ Categories=Game;
             ).pack(side="left", padx=5)
         else:
             ctk.CTkLabel(
-                create_frame, text="No hay versiones instaladas", text_color="gray"
+                create_frame, text=c.UI_NO_VERSIONS_INSTALLED, text_color="gray"
             ).pack()
 
         # Listado de versiones existentes para borrar
         ctk.CTkLabel(
             scroll,
-            text="Gestionar existentes:",
+            text=c.UI_MANAGE_EXISTING_SHORTCUTS,
             font=ctk.CTkFont(size=12, slant="italic"),
         ).pack(pady=(10, 0))
 
@@ -957,12 +897,14 @@ Categories=Game;
         if not found_any:
             ctk.CTkLabel(
                 scroll,
-                text="(Ninguno detectado)",
+                text=c.UI_NO_SHORTCUTS_DETECTED,
                 text_color="gray",
                 font=ctk.CTkFont(size=11),
             ).pack()
 
-        ctk.CTkButton(dialog, text="Cerrar", command=dialog.destroy).pack(pady=10)
+        ctk.CTkButton(dialog, text=c.UI_BUTTON_CLOSE, command=dialog.destroy).pack(pady=10)
+
+        dialog.grab_set()
 
     # ==========================================
     # LÓGICA: HERRAMIENTAS
@@ -977,4 +919,4 @@ Categories=Game;
         try:
             MigrationDialog(self)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir la herramienta: {e}")
+            messagebox.showerror(c.UI_ERROR_TITLE, c.UI_ERROR_MIGRATION_TOOL.format(e=e))

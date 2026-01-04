@@ -1,0 +1,88 @@
+import subprocess
+from tkinter import filedialog
+import shutil
+
+def ask_open_filename_native(parent, title="Abrir archivo", filetypes=[("Todos los archivos", "*")]):
+    """
+    Intenta usar Zenity para un diálogo de archivo nativo, con fallback a Tkinter.
+    Refactorizado para usar check_output y evitar cuelgues del sistema.
+    """
+    if shutil.which("zenity"):
+        parent.grab_release()
+        try:
+            cmd = [
+                "zenity",
+                "--file-selection",
+                f"--title={title}",
+            ]
+            for name, pattern in filetypes:
+                cmd.append(f"--file-filter={name}|{pattern}")
+
+            selected_file = subprocess.check_output(cmd, text=True)
+            return selected_file.strip()
+        except subprocess.CalledProcessError:
+            return ""
+        except Exception as e:
+            print(f"Error al usar Zenity, usando fallback: {e}")
+            # Retornar None puede ser una opción para indicar un error inesperado
+            return None
+        finally:
+            parent.grab_set()
+
+    # Fallback a Tkinter solo si Zenity no está instalado o falla catastróficamente
+    return filedialog.askopenfilename(title=title, filetypes=filetypes)
+
+def ask_directory_native(parent, title="Seleccionar carpeta"):
+    """
+    Intenta usar Zenity para un diálogo de directorio nativo, con fallback a Tkinter.
+    Refactorizado para usar check_output y evitar cuelgues del sistema.
+    """
+    if shutil.which("zenity"):
+        parent.grab_release()
+        try:
+            cmd = [
+                "zenity",
+                "--file-selection",
+                "--directory",
+                f"--title={title}",
+            ]
+            selected_dir = subprocess.check_output(cmd, text=True)
+            return selected_dir.strip()
+        except subprocess.CalledProcessError:
+            return ""
+        except Exception as e:
+            print(f"Error al usar Zenity, usando fallback: {e}")
+            return None
+        finally:
+            parent.grab_set()
+
+    # Fallback a Tkinter solo si Zenity no está instalado o falla catastróficamente
+    return filedialog.askdirectory(title=title)
+
+def ask_open_filenames_native(parent, title="Abrir archivos", filetypes=[("Todos los archivos", "*")]):
+    """
+    Intenta usar Zenity para un diálogo de selección de múltiples archivos.
+    """
+    if shutil.which("zenity"):
+        parent.grab_release()
+        try:
+            cmd = [
+                "zenity",
+                "--file-selection",
+                "--multiple",
+                f"--title={title}",
+            ]
+            for name, pattern in filetypes:
+                cmd.append(f"--file-filter={name}|{pattern}")
+
+            selected_files = subprocess.check_output(cmd, text=True)
+            # Zenity devuelve los archivos separados por un separador, por defecto '|' o '\n'
+            return selected_files.strip().splitlines()
+        except subprocess.CalledProcessError:
+            return []  # Devolver lista vacía si el usuario cancela
+        except Exception as e:
+            print(f"Error al usar Zenity, usando fallback: {e}")
+        finally:
+            parent.grab_set()
+
+    return filedialog.askopenfilenames(title=title, filetypes=filetypes)

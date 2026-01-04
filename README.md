@@ -51,7 +51,7 @@ Para iniciar el launcher, simplemente haz doble clic en el ejecutable `CianovaLa
 ---
 Luego ve a Ajustes y completa la configuración de binarios, requisitos y guarda la config.
 
-**Para saber mas vaya a [MANUAL DE USO](Docs/MANUAL%DE%USO.md).**
+**Para saber mas vaya a [MANUAL DE USO](MANUAL%DE%USO.md).**
 
 ---
 ## 2. Atribución y Dependencias
@@ -59,7 +59,7 @@ Este "launcher" solo funciona de forma independiente en su apartado visual pero 
 
 *   **MCPELauncher-Manifest:** Proyecto base en el que se fundamenta (Creditos a **ChristopherHX** y **MCMrARM**).
 
-**Para ver todos los términos y condiciones vaya a [LICENCE AND TERMS](Docs/LICENCE%&%TERMINOS%y%CONDICIONES.md)**
+**Para ver todos los términos y condiciones vaya a [LICENCE AND TERMS](LICENCE%&%TERMINOS%y%CONDICIONES.md)**
 
 ---
 *Hecho con ❤️ y 🤖 para la comunidad Linux.*
