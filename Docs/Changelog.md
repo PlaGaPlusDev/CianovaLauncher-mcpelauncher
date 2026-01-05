@@ -1,5 +1,11 @@
 # 📝 Changelog - CianovaLauncher
 
+# [v2.0a] - 2026-01-05
+### CHANGES:
+- **Mejor distribución del codigo fuente** ahora esta todo el codigo fuente en la carpeta `src`
+- **BUG FIXES** Solución de bugs que impedian usar correctamente el launcher
+- **MAJOR UPDATES** Ahora se puede utilizar los selectores nativos del sistema en lugar de los por defecto en Tkinter
+
 # [v2.0] - 2026-01-02
 ### ✨Novedades:
 - **Nombre nuevo:** Ahora pasara de MCPETool a la naturaleza de un launcher llamado **CianovaLauncher**
