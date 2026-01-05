@@ -96,6 +96,11 @@ modules:
       - cp -r bin/* /app/bin/ || true
       - chmod +x /app/bin/* || true
 
+      # Pasar los lib necesarios
+      - mkdir -p /app/share/mcpelauncher || true
+      - cp -r libs_mc/lib /app/share/mcpelauncher/
+      - cp libs_mc/gamecontrollerdb.txt /app/share/mcpelauncher/ || true
+
       # Copiar icono
       - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/org.cianova.Launcher.png
 
