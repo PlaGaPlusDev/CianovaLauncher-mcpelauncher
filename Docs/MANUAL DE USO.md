@@ -23,6 +23,10 @@ Para iniciar el launcher, simplemente haz doble clic en el ejecutable `CianovaLa
 
 Luego ve a Ajustes y completa la configuración de binarios y guarda la config.
 #### Opción B - Instalación para Flatpak
+
+**NOTA:** Antes de cualquier instalación por Flatpak recuerda instalarlo en el caso de que no lo tengas.
+Link para configurar Flatpak la primera vez según tu distro: [FLATPAK SETUP](https://flathub.org/en/setup)
+
 ##### Metodo 1 (Recomendado) - Actualizaciones
 
 Descarga el archivo `CianovaLauncher.flatpakrepo` en **RELEASE** o **EXTRA** para instalar y recibir actualizaciones desde tu gestor de software. (Esto descarga automáticamente las ultimas actualizaciones y runtimes necesarios).
