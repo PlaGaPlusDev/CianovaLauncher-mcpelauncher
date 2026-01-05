@@ -5,6 +5,7 @@
 - **Mejor distribución del codigo fuente** ahora esta todo el codigo fuente en la carpeta `src`
 - **BUG FIXES** Solución de bugs que impedian usar correctamente el launcher
 - **MAJOR UPDATES** Ahora se puede utilizar los selectores nativos del sistema en lugar de los por defecto en Tkinter
+- **libsqliteX.so** ya puede encontrar el lib necesario dependiendo de la arquitectura correctamente.
 
 # [v2.0] - 2026-01-02
 ### ✨Novedades:
