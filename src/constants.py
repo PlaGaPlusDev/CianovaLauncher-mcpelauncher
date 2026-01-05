@@ -1,12 +1,40 @@
 # ==========================================
+# MAPA DE DEPENDENCIAS DEL SISTEMA
+# ==========================================
+DEPENDENCY_MAP = {
+    "APT": [
+        "libcurl4", "libssl3", "libx11-6", "libxext6", "libxi6",
+        "libxrandr2", "libxcursor1", "libxfixes3", "libxrender1",
+        "libasound2", "libpulse0", "libsystemd0", "libgl1", "libegl1",
+        "libqt5core5a", "libqt5gui5", "libqt5widgets5", "libqt5network5",
+        "libqt5webengine5", "libqt5qml5", "libqt5quick5", "libqt5svg5",
+        "zenity", "unzip"
+    ],
+    "DNF": [
+        "libcurl", "openssl-libs", "libX11", "libXext", "libXi",
+        "libXrandr", "libXcursor", "libXfixes", "libXrender", "alsa-lib",
+        "pulseaudio-libs", "systemd-libs", "mesa-libGL", "mesa-libEGL",
+        "qt5-qtbase", "qt5-qtwebengine", "qt5-qtdeclarative", "qt5-qtsvg",
+        "qt5-qtquickcontrols2", "zenity", "unzip"
+    ],
+    "PACMAN": [
+        "curl", "openssl", "libx11", "libxext", "libxi", "libxrandr",
+        "libxcursor", "libxfixes", "libxrender", "alsa-lib", "pulseaudio",
+        "systemd-libs", "mesa", "qt5-base", "qt5-webengine",
+        "qt5-declarative", "qt5-svg", "qt5-quickcontrols2", "zenity", "unzip"
+    ]
+}
+
+
+# ==========================================
 # CONSTANTES GLOBALES Y CONFIGURACIÓN
 # ==========================================
 import os
 
 # --- Información de la Aplicación ---
 APP_NAME = "CianovaLauncherMCPE"
-VERSION_LAUNCHER = "2.1"
-CHANGELOG = "Reescritura completa: CianovaLauncherMCPE 2.1 Independencia de bases, configuración persistente."
+VERSION_LAUNCHER = "2.0.0"
+CHANGELOG = "Reescritura completa: CianovaLauncherMCPE 2.0. Independencia de bases, configuración persistente."
 CREDITOS = "Dev: @PlaGaDev & Antigravity\nProyecto: CianovaLauncherMCPE"
 LEGAL_TEXT = """LICENCIA & TÉRMINOS Y CONDICIONES
 
@@ -38,7 +66,6 @@ El software se proporciona "tal cual", sin garantía de ningún tipo. Los desarr
 * Pérdida de datos (mundos, capturas, etc.).
 * Baneos de cuentas por uso indebido.
 * Fallos en el sistema derivados del uso de la herramienta.
-* Algún error causado por descargar un launcher desde una fuente no-oficial.
 
 Al utilizar CianovaLauncher, aceptas estos términos y condiciones.
 
@@ -235,15 +262,19 @@ UI_SCREENSHOTS_NOT_FOUND_MSG = "No se encontró la carpeta específica 'Screensh
 UI_OPEN_COMOJANG_FOLDER_PROMPT = "{msg}\n\n¿Quieres abrir la carpeta 'com.mojang' para buscarla manualmente?"
 UI_CANNOT_OPEN_FOLDER_ERROR = "No se pudo abrir la carpeta: {e}"
 UI_FLATPAK_RUNTIME_INFO_TITLE = "Requisitos de Runtime Flatpak"
-UI_FLATPAK_RUNTIME_INFO_TEXT = """✅ Runtimes Requeridos:
-• org.kde.Platform//5.15-23.08
-• io.qt.qtwebengine.BaseApp//5.15-23.08
-ℹ️ Estas dependencias se instalaron automáticamente.
-📋 Para verificar manualmente:
-flatpak list --runtime | grep "org.kde"
-🔧 Si falta algún runtime:
-flatpak install flathub org.kde.Platform//5.15-23.08
-flatpak install flathub io.qt.qtwebengine.BaseApp//5.15-23.08"""
+UI_FLATPAK_RUNTIME_INFO_TEXT = """
+El lanzador se ejecuta en Flatpak. Las dependencias son manejadas
+por el entorno de ejecución (runtime).
+
+Asegúrate de tener instalados los runtimes necesarios.
+
+Para Usuarios:
+- org.kde.Platform//5.15-23.08
+- io.qt.qtwebengine.BaseApp//5.15-23.08
+
+Para Desarrolladores:
+- org.kde.Sdk//5.15-23.08
+"""
 UI_DEPENDENCY_CHECK_ERROR = "No se encontró '{list_file}'"
 UI_PKG_MANAGER_NOT_SUPPORTED = "Gestor de paquetes no soportado."
 UI_DEPENDENCY_LIST_READ_ERROR = "Error leyendo lista: {e}"

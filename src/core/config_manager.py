@@ -29,6 +29,10 @@ class ConfigManager:
         }
         self.config = self.load_config()
 
+    def restore_defaults(self):
+        self.config = self.default_config.copy()
+        self.save_config()
+
     def load_config(self):
         """Carga configuración con migración automática desde archivo antiguo"""
         # Intentar cargar desde nuevo archivo
@@ -74,7 +78,7 @@ class ConfigManager:
             except Exception as e:
                 print(f"Error migrando config: {e}")
 
-        return self.default_config
+        return self.default_config.copy()
 
     def save_config(self):
         try:

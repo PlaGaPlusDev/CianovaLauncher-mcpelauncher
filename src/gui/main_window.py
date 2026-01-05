@@ -13,9 +13,13 @@ from src.gui.install_dialog import InstallDialog
 from src.gui.skin_pack_tool import SkinPackTool
 from src.gui.migration_dialog import MigrationDialog
 from src.core import app_logic
+from src.gui.tabs.play_tab import PlayTab
+from src.gui.tabs.tools_tab import ToolsTab
+from src.gui.tabs.settings_tab import SettingsTab
+from src.gui.tabs.about_tab import AboutTab
 
 class CianovaLauncherApp(ctk.CTk):
-    def __init__(self):
+    def __init__(self, force_flatpak_ui=False):
         super().__init__()
 
         # Lógica de la aplicación
@@ -25,9 +29,10 @@ class CianovaLauncherApp(ctk.CTk):
         # 1. RUTAS Y DETECCIÓN (MOVIDO AL INICIO)
         # ==========================================
         self.home = c.HOME_DIR
+        self.force_flatpak_ui = force_flatpak_ui
 
         # Detectar si estamos en Flatpak
-        self.running_in_flatpak = self.logic.is_running_in_flatpak()
+        self.running_in_flatpak = self.logic.is_running_in_flatpak() or self.force_flatpak_ui
 
         # DEBUG LOGS
         print(f"DEBUG: Home: {self.home}")
@@ -137,11 +142,11 @@ class CianovaLauncherApp(ctk.CTk):
         # INTERFAZ PRINCIPAL (LAYOUT)
         # ==========================================
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1) # Fila principal se expande
 
         # Tabview
-        self.tabview = ctk.CTkTabview(self, corner_radius=15)
-        self.tabview.grid(row=0, column=0, padx=15, pady=15, sticky="nsew")
+        self.tabview = ctk.CTkTabview(self, corner_radius=10)
+        self.tabview.grid(row=0, column=0, padx=10, pady=(5, 10), sticky="nsew")
 
         self.tab_launcher = self.tabview.add(c.UI_TAB_PLAY)
         self.tab_tools = self.tabview.add(c.UI_TAB_TOOLS)
@@ -149,10 +154,10 @@ class CianovaLauncherApp(ctk.CTk):
         self.tab_about = self.tabview.add(c.UI_TAB_ABOUT)
 
         # Inicializar Componentes
-        self.setup_launcher_tab()
-        self.setup_tools_tab()
-        self.setup_settings_tab()
-        self.setup_about_tab()
+        self.play_tab = PlayTab(self.tab_launcher, self)
+        self.tools_tab = ToolsTab(self.tab_tools, self)
+        self.settings_tab = SettingsTab(self.tab_settings, self)
+        self.about_tab = AboutTab(self.tab_about, self)
 
         # Detectar instalación al inicio (usando nueva lógica)
         self.logic.detect_installation(self)
@@ -181,492 +186,19 @@ class CianovaLauncherApp(ctk.CTk):
                 self.config_manager.set(c.CONFIG_KEY_WINDOW_SIZE, size)
 
     # ==========================================
-    # PESTAÑA 1: LANZADOR (MINIMALISTA)
-    # ==========================================
-    def setup_launcher_tab(self):
-        self.tab_launcher.grid_columnconfigure(0, weight=1)
-        self.tab_launcher.grid_rowconfigure(2, weight=1)
-
-        # Cabecera
-        self.frame_header = ctk.CTkFrame(self.tab_launcher, fg_color="transparent")
-        self.frame_header.grid(row=0, column=0, pady=(5, 5), sticky="ew")
-
-        self.lbl_status = ctk.CTkLabel(
-            self.frame_header,
-            text=c.UI_LABEL_SEARCHING,
-            font=ctk.CTkFont(size=13, weight="bold"),
-        )
-        self.lbl_status.pack(side="left", padx=10)
-
-        # Selector de modo con opciones según contexto
-        if self.running_in_flatpak:
-            mode_values = c.UI_MODE_VALUES_FLATPAK
-        else:
-            mode_values = c.UI_MODE_VALUES_NORMAL
-
-        self.combo_mode = ctk.CTkComboBox(
-            self.frame_header,
-            values=mode_values,
-            command=lambda mode: self.logic.change_mode_ui(self, mode),
-            width=180,  # Aumentado para acomodar nombres más largos
-            height=28,
-            corner_radius=8,
-        )
-        self.combo_mode.pack(side="right", padx=10)
-        ctk.CTkLabel(
-            self.frame_header,
-            text=c.UI_LABEL_INSTALLATION,
-            text_color="gray",
-            font=ctk.CTkFont(size=12),
-        ).pack(side="right", padx=5)
-
-        # Lista (Card Style)
-        self.version_listbox = ctk.CTkScrollableFrame(
-            self.tab_launcher, label_text=c.UI_LABEL_INSTALLED_VERSIONS, corner_radius=12
-        )
-        self.version_listbox.grid(row=2, column=0, padx=15, pady=5, sticky="nsew")
-        self.version_var = ctk.StringVar(value="")
-
-        # Opciones
-        self.frame_launch_opts = ctk.CTkFrame(self.tab_launcher, fg_color="transparent")
-        self.frame_launch_opts.grid(row=3, column=0, pady=5)
-
-        self.var_close_on_launch = ctk.BooleanVar(
-            value=self.config.get(c.CONFIG_KEY_CLOSE_ON_LAUNCH, False)
-        )
-        self.check_close_on_launch = ctk.CTkCheckBox(
-            self.frame_launch_opts,
-            text=c.UI_CHECKBOX_CLOSE_ON_LAUNCH,
-            variable=self.var_close_on_launch,
-            corner_radius=15,
-            font=ctk.CTkFont(size=12),
-        )
-        self.check_close_on_launch.pack(side="left", padx=10)
-
-        self.var_debug_log = ctk.BooleanVar(value=self.config.get(c.CONFIG_KEY_DEBUG_LOG, False))
-        self.check_debug_log = ctk.CTkCheckBox(
-            self.frame_launch_opts,
-            text=c.UI_CHECKBOX_DEBUG_LOG,
-            variable=self.var_debug_log,
-            corner_radius=15,
-            font=ctk.CTkFont(size=12),
-        )
-        self.check_debug_log.pack(side="left", padx=10)
-
-        # Botón
-        self.btn_launch = ctk.CTkButton(
-            self.tab_launcher,
-            text=c.UI_BUTTON_PLAY_NOW,
-            height=50,
-            corner_radius=15,
-            font=ctk.CTkFont(size=20, weight="bold"),
-            fg_color=c.COLOR_PRIMARY_GREEN,
-            hover_color=c.COLOR_PRIMARY_GREEN_HOVER,
-            command=lambda: self.logic.launch_game(self),
-        )
-        self.btn_launch.grid(row=4, column=0, padx=30, pady=15, sticky="ew")
-
-    # ==========================================
     # PESTAÑA 2: HERRAMIENTAS (ORGANIZADO)
     # ==========================================
-    def setup_tools_tab(self):
-        # Usar ScrollableFrame para que todo quepa en pantallas pequeñas
-        self.scroll_tools = ctk.CTkScrollableFrame(
-            self.tab_tools, fg_color="transparent"
-        )
-        self.scroll_tools.pack(fill="both", expand=True, padx=5, pady=5)
-
-        self.scroll_tools.grid_columnconfigure(0, weight=1)
-        self.scroll_tools.grid_columnconfigure(1, weight=1)
-
-        # Grid con pesos para alineación
-        self.scroll_tools.grid_columnconfigure(0, weight=1)
-        self.scroll_tools.grid_columnconfigure(1, weight=1)
-        self.scroll_tools.grid_rowconfigure(0, weight=1)
-
-        # --- Columna Izquierda ---
-        frame_left = ctk.CTkFrame(self.scroll_tools, fg_color="transparent")
-        frame_left.grid(row=0, column=0, padx=(10, 5), pady=10, sticky="nsew")
-
-        # Panel: Gestión
-        frame_install = ctk.CTkFrame(frame_left, corner_radius=12)
-        frame_install.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            frame_install, text=c.UI_SECTION_MANAGEMENT, font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=(10, 2))
-        ctk.CTkButton(
-            frame_install,
-            text=c.UI_BUTTON_INSTALL_APK,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_BLUE_BUTTON,
-            command=self.install_apk_dialog,
-        ).pack(pady=5, padx=15, fill="x")
-        ctk.CTkButton(
-            frame_install,
-            text=c.UI_BUTTON_MOVE_DELETE_VERSION,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_RED_BUTTON,
-            hover_color=c.COLOR_RED_BUTTON_HOVER,
-            command=lambda: self.logic.delete_version_dialog(self),
-        ).pack(pady=5, padx=15, fill="x")
-
-        # Botón de migración (especialmente útil en Flatpak)
-        ctk.CTkButton(
-            frame_install,
-            text=c.UI_BUTTON_MIGRATE_DATA,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_PURPLE_BUTTON,
-            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
-            command=self.open_migration_tool,
-        ).pack(pady=5, padx=15, fill="x")
-
-        # Panel: Personalización
-        frame_custom = ctk.CTkFrame(frame_left, corner_radius=12)
-        frame_custom.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(
-            frame_custom,
-            text=c.UI_SECTION_CUSTOMIZATION,
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(pady=10)
-        ctk.CTkButton(
-            frame_custom,
-            text=c.UI_BUTTON_SKIN_PACK_CREATOR,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_BLUE_BUTTON,
-            command=self.open_skin_tool,
-        ).pack(pady=5, padx=15, fill="x")
-
-        self.lbl_shader_status = ctk.CTkLabel(
-            frame_custom, text=c.UI_LABEL_SHADERS_STATUS, font=ctk.CTkFont(size=11)
-        )
-        self.lbl_shader_status.pack(pady=(5, 0))
-        ctk.CTkButton(
-            frame_custom,
-            text=c.UI_BUTTON_FIX_SHADERS,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_YELLOW_BUTTON,
-            hover_color=c.COLOR_YELLOW_BUTTON_HOVER,
-            command=lambda: self.logic.disable_shaders(self),
-        ).pack(pady=5, padx=15, fill="x")
-
-        # Panel: Archivos (movido aquí al lado izquierdo)
-        frame_files = ctk.CTkFrame(frame_left, corner_radius=12)
-        frame_files.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(
-            frame_files, text=c.UI_SECTION_FILES, font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=(15, 5))
-        ctk.CTkButton(
-            frame_files,
-            text=c.UI_BUTTON_OPEN_DATA_FOLDER,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_GRAY_BUTTON,
-            hover_color=c.COLOR_GRAY_BUTTON_HOVER,
-            command=lambda: self.logic.open_data_folder(self),
-        ).pack(pady=5, padx=15, fill="x")
-
-        # --- Columna Derecha ---
-        frame_right = ctk.CTkFrame(self.scroll_tools, fg_color="transparent")
-        frame_right.grid(row=0, column=1, padx=(5, 10), pady=10, sticky="nsew")
-
-        # Panel: Herramientas de Sistema
-        frame_sys = ctk.CTkFrame(frame_right, corner_radius=12)
-        frame_sys.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            frame_sys, text=c.UI_SECTION_SYSTEM, font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=(15, 5))
-        self.btn_verify_deps = ctk.CTkButton(
-            frame_sys,
-            text=c.UI_BUTTON_VERIFY_DEPS,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_PURPLE_BUTTON,
-            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
-            command=lambda: self.logic.verify_dependencies(self),
-        )
-        self.btn_verify_deps.pack(pady=5, padx=20, fill="x")
-        ctk.CTkButton(
-            frame_sys,
-            text=c.UI_BUTTON_VERIFY_HW,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_PURPLE_BUTTON,
-            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
-            command=lambda: self.logic.check_requirements_dialog(self),
-        ).pack(pady=5, padx=20, fill="x")
-
-        # Panel: Acceso Directo del Menú
-        frame_shortcut = ctk.CTkFrame(frame_right, corner_radius=12)
-        frame_shortcut.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(
-            frame_shortcut,
-            text=c.UI_SECTION_SHORTCUT,
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(pady=(15, 5))
-        ctk.CTkButton(
-            frame_shortcut,
-            text=c.UI_BUTTON_MANAGE_SHORTCUT,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_GREEN_BUTTON,
-            hover_color=c.COLOR_GREEN_BUTTON_HOVER,
-            command=self.manage_desktop_shortcut,
-        ).pack(pady=5, padx=20, fill="x")
-
-        # Panel: Exportación
-        frame_export = ctk.CTkFrame(frame_right, corner_radius=12)
-        frame_export.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(
-            frame_export, text=c.UI_SECTION_EXPORT, font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=(15, 5))
-        ctk.CTkButton(
-            frame_export,
-            text=c.UI_BUTTON_EXPORT_WORLDS,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_BLUE_BUTTON,
-            command=lambda: self.logic.export_worlds_dialog(self),
-        ).pack(pady=5, padx=20, fill="x")
-        ctk.CTkButton(
-            frame_export,
-            text=c.UI_BUTTON_OPEN_SCREENSHOTS,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_BLUE_BUTTON,
-            command=lambda: self.logic.export_screenshots_dialog(self),
-        ).pack(pady=5, padx=20, fill="x")
-
-        # Créditos (Footer Global)
-        frame_credits = ctk.CTkFrame(self.scroll_tools, fg_color="transparent")
-        frame_credits.grid(row=2, column=0, columnspan=2, pady=5)
-        ctk.CTkLabel(
-            frame_credits, text=c.CREDITOS, text_color="gray", font=ctk.CTkFont(size=10)
-        ).pack()
-
     # ==========================================
     # PESTAÑA 3: AJUSTES (CONFIGURACIÓN)
     # ==========================================
-    def setup_settings_tab(self):
-        # Usar ScrollableFrame
-        self.scroll_settings = ctk.CTkScrollableFrame(
-            self.tab_settings, fg_color="transparent"
-        )
-        self.scroll_settings.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # --- Configuración de Binarios ---
-        self.frame_bin = ctk.CTkFrame(self.scroll_settings, corner_radius=12)
-        self.frame_bin.pack(fill="x", padx=10, pady=10)
-
-        ctk.CTkLabel(
-            self.frame_bin,
-            text=c.UI_SECTION_BINARIES,
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(pady=10)
-
-        # Selector de Modo
-        if not self.running_in_flatpak:
-            modes = c.UI_MODES_SETTINGS_NORMAL
-        else:
-            modes = c.UI_MODES_SETTINGS_FLATPAK
-
-        self.combo_settings_mode = ctk.CTkComboBox(
-            self.frame_bin,
-            values=modes,
-            command=self.on_settings_mode_change,
-            width=250,
-        )
-        self.combo_settings_mode.pack(pady=(0, 15))
-        self.combo_settings_mode.set(self.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
-
-        # Flatpak Selector (Solo visible si es Flatpak)
-        self.frame_flatpak_id = ctk.CTkFrame(self.frame_bin, fg_color="transparent")
-        ctk.CTkLabel(
-            self.frame_flatpak_id, text=c.UI_LABEL_FLATPAK_ID, width=150, anchor="w"
-        ).pack(side="left")
-        self.entry_flatpak_id = ctk.CTkEntry(self.frame_flatpak_id)
-        self.entry_flatpak_id.pack(side="left", fill="x", expand=True)
-        self.entry_flatpak_id.insert(
-            0, self.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
-        )
-        self.btn_flatpak_custom = ctk.CTkButton(
-            self.frame_flatpak_id,
-            text="?",
-            width=30,
-            command=lambda: messagebox.showinfo(
-                c.UI_INFO_TITLE, c.UI_FLATPAK_ID_EXAMPLE
-            ),
-        )
-        self.btn_flatpak_custom.pack(side="right", padx=5)
-
-        # Helper
-        def create_path_input(parent, label, key, file_types):
-            f = ctk.CTkFrame(parent, fg_color="transparent")
-            f.pack(fill="x", padx=10, pady=5)
-            ctk.CTkLabel(f, text=label, width=150, anchor="w").pack(side="left")
-            entry = ctk.CTkEntry(f)
-            entry.pack(side="left", fill="x", expand=True, padx=5)
-            entry.insert(0, self.config[c.CONFIG_KEY_BINARY_PATHS].get(key, ""))
-
-            def browse():
-                path = ask_open_filename_native(self, title=f"Seleccionar {label}", filetypes=file_types)
-                if path:
-                    entry.delete(0, "end")
-                    entry.insert(0, path)
-
-            btn = ctk.CTkButton(f, text="...", width=40, command=browse)
-            btn.pack(side="right")
-            return entry, btn, f
-
-        # Inputs
-        self.entry_client, self.btn_client, self.f_client = create_path_input(
-            self.frame_bin, "Cliente (game):", c.CONFIG_KEY_CLIENT, [("Ejecutable", "*")]
-        )
-        self.entry_extract, self.btn_extract, self.f_extract = create_path_input(
-            self.frame_bin, "Extractor APK:", c.CONFIG_KEY_EXTRACT, [("Ejecutable", "*")]
-        )
-        self.entry_webview, self.btn_webview, self.f_webview = create_path_input(
-            self.frame_bin, "Webview (Opcional):", c.CONFIG_KEY_WEBVIEW, [("Ejecutable", "*")]
-        )
-        self.entry_error, self.btn_error, self.f_error = create_path_input(
-            self.frame_bin, "Error Handler (Opcional):", c.CONFIG_KEY_ERROR, [("Ejecutable", "*")]
-        )
-
-        # Botones de Acción
-        frame_actions = ctk.CTkFrame(self.scroll_settings, fg_color="transparent")
-        frame_actions.pack(pady=10)
-
-        ctk.CTkButton(
-            frame_actions,
-            text=c.UI_BUTTON_SAVE_SETTINGS,
-            fg_color=c.COLOR_PRIMARY_GREEN,
-            hover_color=c.COLOR_PRIMARY_GREEN_HOVER,
-            command=self.save_settings,
-        ).pack(side="left", padx=10)
-
-        # --- Configuración de Apariencia (Movida al final) ---
-        frame_appearance = ctk.CTkFrame(self.scroll_settings, corner_radius=12)
-        frame_appearance.pack(fill="x", padx=10, pady=10)
-
-        ctk.CTkLabel(
-            frame_appearance,
-            text=c.UI_SECTION_APPEARANCE,
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(pady=10)
-
-        f_theme = ctk.CTkFrame(frame_appearance, fg_color="transparent")
-        f_theme.pack(pady=5)
-
-        # Solo Color Principal (eliminamos Light/Dark/System)
-        ctk.CTkLabel(f_theme, text=c.UI_LABEL_COLOR_THEME).pack(side="left", padx=5)
-        self.option_color = ctk.CTkOptionMenu(
-            f_theme,
-            values=c.UI_COLOR_THEMES,
-            command=lambda color: self.change_appearance("color", color),
-        )
-        self.option_color.pack(side="left", padx=10)
-        self.option_color.set(self.config.get(c.CONFIG_KEY_COLOR_THEME, "blue"))
-
-        ctk.CTkLabel(
-            frame_appearance,
-            text=c.UI_RESTART_REQUIRED_MSG,
-            text_color="gray",
-            font=ctk.CTkFont(size=10),
-        ).pack(pady=5)
-
-        # Inicializar estado visual
-        self.on_settings_mode_change(self.combo_settings_mode.get())
-
-    def on_settings_mode_change(self, mode):
-        # Lógica para ocultar/mostrar/deshabilitar inputs según modo
-        is_flatpak_mode = "Flatpak" in mode
-        is_flatpak_custom = mode == "Flatpak (Personalizado)"
-        is_custom_bin = mode == "Personalizado"
-
-        # 1. Selector de ID Flatpak
-        if is_flatpak_mode:
-            self.frame_flatpak_id.pack(fill="x", padx=10, pady=5, before=self.f_client)
-            if is_flatpak_custom:
-                self.entry_flatpak_id.configure(
-                    state="normal", fg_color=["#F9F9FA", "#343638"]
-                )
-            else:
-                self.entry_flatpak_id.configure(state="disabled", fg_color="gray30")
-        else:
-            self.frame_flatpak_id.pack_forget()
-
-        # 2. Estado de Inputs de Binarios
-        state = "normal" if is_custom_bin else "disabled"
-
-        for e, b in [
-            (self.entry_client, self.btn_client),
-            (self.entry_extract, self.btn_extract),
-            (self.entry_webview, self.btn_webview),
-            (self.entry_error, self.btn_error),
-        ]:
-            if is_custom_bin:
-                e.configure(state="normal", fg_color=["#F9F9FA", "#343638"])
-            else:
-                e.configure(state="disabled", fg_color="gray30")
-            b.configure(state=state)
-
-    def save_settings(self):
-        mode = self.combo_settings_mode.get()
-        self.config[c.CONFIG_KEY_MODE] = mode
-        self.config[c.CONFIG_KEY_FLATPAK_ID] = self.entry_flatpak_id.get()
-
-        # Solo guardar paths si es personalizado
-        if "Personalizado" in mode:
-            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_CLIENT] = self.entry_client.get()
-            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_EXTRACT] = self.entry_extract.get()
-            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_WEBVIEW] = self.entry_webview.get()
-            self.config[c.CONFIG_KEY_BINARY_PATHS][c.CONFIG_KEY_ERROR] = self.entry_error.get()
-
-        self.config_manager.save_config()
-        messagebox.showinfo(
-            c.UI_SUCCESS_TITLE,
-            c.UI_SAVE_SUCCESS_MSG,
-        )
-        self.logic.detect_installation(self)  # Refrescar todo
-
     # ==========================================
     # PESTAÑA 4: ACERCA DE (LEGAL)
     # ==========================================
-    def setup_about_tab(self):
-        self.tab_about.grid_columnconfigure(0, weight=1)
-
-        # Licencia y Términos
-        frame_legal = ctk.CTkScrollableFrame(
-            self.tab_about, label_text="Términos y Condiciones", corner_radius=12
-        )
-        frame_legal.pack(fill="both", expand=True, padx=20, pady=10)
-
-        lbl_legal = ctk.CTkLabel(
-            frame_legal,
-            text=c.LEGAL_TEXT,
-            justify="left",
-            wraplength=500,
-            font=ctk.CTkFont(size=11),
-        )
-        lbl_legal.pack(padx=10, pady=10, anchor="w")
-
-        # Créditos
-        ctk.CTkLabel(self.tab_about, text=c.CREDITOS, font=ctk.CTkFont(size=12)).pack(
-            pady=10
-        )
-        ctk.CTkLabel(
-            self.tab_about, text=f"Versión: {c.VERSION_LAUNCHER}", text_color="gray"
-        ).pack()
+    def restore_default_settings(self):
+        if messagebox.askyesno("Confirmar", "¿Estás seguro de que quieres restaurar todos los ajustes a sus valores por defecto? La aplicación se cerrará."):
+            self.config_manager.restore_defaults()
+            messagebox.showinfo("Ajustes restaurados", "Los ajustes se han restaurado. La aplicación se cerrará ahora.")
+            self.destroy()
 
     def change_appearance(self, type_change, value):
         if type_change == "color":

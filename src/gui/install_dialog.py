@@ -10,7 +10,7 @@ class InstallDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self.parent = parent
         self.title("Instalar Nueva Versión")
-        self.geometry("500x450")  # Un poco más alto para el mensaje de error
+        self.geometry("500x500")  # Un poco más alto para el mensaje de error
         self.resizable(False, False)
 
         self.transient(parent)
@@ -136,14 +136,14 @@ class InstallDialog(ctk.CTkToplevel):
         self.btn_install = ctk.CTkButton(
             self,
             text="INSTALAR AHORA",
-            height=50,
+            height=40,
             fg_color="green",
             hover_color="darkgreen",
             command=self.start_install,
             state="disabled",
             font=ctk.CTkFont(size=15, weight="bold"),
         )
-        self.btn_install.pack(pady=20, padx=40, fill="x")
+        self.btn_install.pack(pady=(15, 20), padx=40, fill="x", side="bottom")
 
         # Centrar y hacer modal
         self.update_idletasks()

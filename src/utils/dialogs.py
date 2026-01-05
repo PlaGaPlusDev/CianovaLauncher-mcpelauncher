@@ -7,6 +7,9 @@ def ask_open_filename_native(parent, title="Abrir archivo", filetypes=[("Todos l
     Intenta usar Zenity para un diálogo de archivo nativo, con fallback a Tkinter.
     Refactorizado para usar check_output y evitar cuelgues del sistema.
     """
+    if hasattr(parent, 'force_flatpak_ui') and parent.force_flatpak_ui:
+        return filedialog.askopenfilename(title=title, filetypes=filetypes)
+
     if shutil.which("zenity"):
         parent.grab_release()
         try:
@@ -37,6 +40,9 @@ def ask_directory_native(parent, title="Seleccionar carpeta"):
     Intenta usar Zenity para un diálogo de directorio nativo, con fallback a Tkinter.
     Refactorizado para usar check_output y evitar cuelgues del sistema.
     """
+    if hasattr(parent, 'force_flatpak_ui') and parent.force_flatpak_ui:
+        return filedialog.askdirectory(title=title)
+
     if shutil.which("zenity"):
         parent.grab_release()
         try:
@@ -63,6 +69,9 @@ def ask_open_filenames_native(parent, title="Abrir archivos", filetypes=[("Todos
     """
     Intenta usar Zenity para un diálogo de selección de múltiples archivos.
     """
+    if hasattr(parent, 'force_flatpak_ui') and parent.force_flatpak_ui:
+        return filedialog.askopenfilenames(title=title, filetypes=filetypes)
+
     if shutil.which("zenity"):
         parent.grab_release()
         try:

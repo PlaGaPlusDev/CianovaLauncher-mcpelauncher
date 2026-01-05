@@ -36,7 +36,7 @@ def launch_from_args(app, version):
     """Helper para lanzar una versión directamente desde argumentos"""
     versions = get_installed_versions(app)
     if version in versions:
-        app.version_var.set(version)
+        app.play_tab.version_var.set(version)
         launch_game(app)
     else:
         messagebox.showerror(c.UI_ERROR_TITLE, c.UI_VERSION_NOT_INSTALLED_ERROR.format(version=version))
@@ -88,7 +88,7 @@ def process_apk(app, apk_path, ver_name, target_root=None, is_target_flatpak=Non
     threading.Thread(target=run_extraction).start()
 
 def delete_version_dialog(app):
-    version = app.version_var.get()
+    version = app.play_tab.version_var.get()
     if not version:
         return
 
@@ -160,26 +160,41 @@ def open_data_folder(app):
         subprocess.Popen(["xdg-open", app.active_path])
 
 def detect_installation(app, mode_override=None):
-    mode_str = mode_override if mode_override else app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE)
+    config_mode = app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE)
+
+    # El `mode_override` es cuando el usuario cambia desde el ComboBox de la UI de Jugar.
+    # El `config_mode` es el modo de binarios guardado en Ajustes.
+
+    # Mapear el modo de binarios de config al modo de instalación de la UI
+    binary_to_install_map = {
+        "Sistema (Instalado)": "Local",
+        "Local (Junto al script)": "Local",
+        "Personalizado": "Local",
+        "Flatpak (Personalizado)": "Flatpak (Personalizado)"
+    }
+
+    # Determinar el modo a mostrar en la UI de Jugar
+    # Si el usuario acaba de cambiarlo, usar ese. Si no, usar el mapeo del modo guardado.
+    display_mode = mode_override if mode_override else binary_to_install_map.get(config_mode, "Local")
+
     flatpak_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.DEFAULT_FLATPAK_ID)
 
     std_local_path = app.compiled_path
     std_local_shared = os.path.join(app.home, c.LOCAL_SHARE_DIR)
 
     status_text, status_color = "", "gray"
-    if mode_str == "Local (Propio)":
+    app.is_flatpak = False # Resetear estado
+
+    if display_mode == "Local (Propio)":
         status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
-        app.is_flatpak = False
         app.active_path = app.our_data_path if app.running_in_flatpak else std_local_path
-    elif mode_str == "Local (Compartido)":
+    elif display_mode == "Local (Compartido)":
         status_text, status_color = c.UI_STATUS_LOCAL_SHARED, "#27ae60"
-        app.is_flatpak = False
         app.active_path = std_local_shared
-    elif mode_str == "Local":
+    elif display_mode == "Local":
         status_text, status_color = c.UI_STATUS_LOCAL, "#27ae60"
-        app.is_flatpak = False
         app.active_path = std_local_path
-    elif "Flatpak" in mode_str and "Personalizado" in mode_str:
+    elif "Flatpak" in display_mode:
         status_text, status_color = c.UI_STATUS_FLATPAK_CUSTOM.format(flatpak_id=flatpak_id), "#3498db"
         app.is_flatpak = True
         std_flatpak_path = os.path.join(app.home, f"{c.FLATPAK_DATA_DIR}/{flatpak_id}/{c.MCPELAUNCHER_DATA_SUBDIR}")
@@ -187,20 +202,14 @@ def detect_installation(app, mode_override=None):
         app.flatpak_path = std_flatpak_path
         if not os.path.exists(app.active_path):
             status_text, status_color = c.UI_STATUS_FLATPAK_NO_DATA, "orange"
-        try:
-            app.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_FLATPAK)
-        except: pass
-    else:
-        status_text, status_color = f"● Modo: {mode_str}", "#27ae60"
-        app.is_flatpak = False
-        app.active_path = std_local_path
-        if not os.path.exists(os.path.join(app.active_path, c.VERSIONS_DIR)):
-            status_text, status_color = c.UI_STATUS_LOCAL_NO_VERSIONS, "gray"
-        try:
-            app.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_LOCAL)
-        except: pass
 
-    app.lbl_status.configure(text=status_text, text_color=status_color)
+    # Si después de toda la lógica, la ruta activa no tiene versiones, mostrarlo
+    if app.active_path and not os.path.exists(os.path.join(app.active_path, c.VERSIONS_DIR)):
+         if "Flatpak" not in display_mode:
+            status_text, status_color = c.UI_STATUS_LOCAL_NO_VERSIONS, "gray"
+
+    # Actualizar UI
+    app.play_tab.lbl_status.configure(text=status_text, text_color=status_color)
 
     if app.active_path and not app.is_flatpak:
         try:
@@ -209,14 +218,28 @@ def detect_installation(app, mode_override=None):
 
     refresh_version_list(app)
     check_shader_status(app)
+
+    # Sincronizar selectores y estado
     try:
-        app.combo_mode.set(mode_str)
-        app.combo_settings_mode.set(app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
-        app.on_settings_mode_change(app.config.get(c.CONFIG_KEY_MODE, c.UI_DEFAULT_MODE))
+        app.play_tab.combo_mode.set(display_mode) # El selector de Jugar muestra el modo de instalación
+        app.settings_tab.combo_settings_mode.set(config_mode) # El selector de Ajustes muestra el modo de binarios
+        app.settings_tab.on_settings_mode_change(config_mode)
+
+        # Ajustar texto del botón de dependencias
+        if app.is_flatpak:
+             app.tools_tab.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_FLATPAK)
+        else:
+             app.tools_tab.btn_verify_deps.configure(text=c.UI_BUTTON_VERIFY_DEPS_LOCAL)
     except Exception: pass
 
+    try:
+        app.tools_tab.lbl_tools_status.configure(text=status_text, text_color=status_color)
+    except Exception as e:
+        pass
+
+
 def change_mode_ui(app, mode_str):
-    if mode_str == "Flatpak (Custom)":
+    if mode_str == "Flatpak (Personalizado)":
         dialog = ctk.CTkToplevel(app)
         dialog.title(c.UI_CONFIG_FLATPAK_CUSTOM_TITLE)
         dialog.geometry("400x180")
@@ -233,8 +256,11 @@ def change_mode_ui(app, mode_str):
         def save_and_apply():
             new_id = entry_id.get().strip()
             if new_id:
+                # Guardar en la configuración principal
                 app.config[c.CONFIG_KEY_FLATPAK_ID] = new_id
+                app.config_manager.save_config()
                 dialog.destroy()
+                # Refrescar la UI con el nuevo ID
                 detect_installation(app, mode_override="Flatpak (Personalizado)")
             else:
                 messagebox.showwarning(c.UI_INFO_TITLE, c.UI_FLATPAK_ID_REQUIRED_MSG)
@@ -242,6 +268,7 @@ def change_mode_ui(app, mode_str):
         ctk.CTkButton(dialog, text=c.UI_BUTTON_USE_ID, command=save_and_apply).pack(pady=10)
         dialog.grab_set()
     else:
+        # Para otros modos, simplemente refrescamos la UI
         detect_installation(app, mode_override=mode_str)
 
 def is_running_in_flatpak():
@@ -318,7 +345,7 @@ def resolve_version(version_path):
     return None
 
 def refresh_version_list(app):
-    for widget in app.version_listbox.winfo_children():
+    for widget in app.play_tab.version_listbox.winfo_children():
         widget.destroy()
     app.version_cards = {}
     if not app.active_path:
@@ -326,13 +353,13 @@ def refresh_version_list(app):
 
     versions_dir = os.path.join(app.active_path, c.VERSIONS_DIR)
     if not os.path.exists(versions_dir):
-        ctk.CTkLabel(app.version_listbox, text=c.UI_NO_VERSIONS_FOLDER_MSG).pack()
+        ctk.CTkLabel(app.play_tab.version_listbox, text=c.UI_NO_VERSIONS_FOLDER_MSG).pack()
         return
 
     try:
         versions = sorted([d for d in os.listdir(versions_dir) if os.path.isdir(os.path.join(versions_dir, d))])
         if not versions:
-            ctk.CTkLabel(app.version_listbox, text=c.UI_NO_VERSIONS_INSTALLED).pack()
+            ctk.CTkLabel(app.play_tab.version_listbox, text=c.UI_NO_VERSIONS_INSTALLED).pack()
             return
 
         for v in versions:
@@ -341,7 +368,7 @@ def refresh_version_list(app):
                 real_ver = resolve_version(os.path.join(versions_dir, v))
                 if real_ver: display_name = f"current (Detectada: {real_ver})"
 
-            card = ctk.CTkFrame(app.version_listbox, corner_radius=10, fg_color=("gray85", "gray25"))
+            card = ctk.CTkFrame(app.play_tab.version_listbox, corner_radius=10, fg_color=("gray85", "gray25"))
             card.pack(fill="x", pady=5, padx=5)
             if app.app_icon_image:
                 lbl_icon = ctk.CTkLabel(card, text="", image=app.app_icon_image)
@@ -356,13 +383,13 @@ def refresh_version_list(app):
         last_ver = app.config.get(c.CONFIG_KEY_LAST_VERSION)
         if last_ver and last_ver in versions:
             select_version(app, last_ver)
-        elif versions and not app.version_var.get():
+        elif versions and not app.play_tab.version_var.get():
             select_version(app, versions[0])
     except Exception as e:
-        ctk.CTkLabel(app.version_listbox, text=c.UI_ERROR_LISTING_VERSIONS.format(e=e)).pack()
+        ctk.CTkLabel(app.play_tab.version_listbox, text=c.UI_ERROR_LISTING_VERSIONS.format(e=e)).pack()
 
 def select_version(app, version):
-    app.version_var.set(version)
+    app.play_tab.version_var.set(version)
     for v, card in app.version_cards.items():
         card.configure(fg_color=(c.COLOR_PRIMARY_GREEN, c.COLOR_SELECTED_GREEN) if v == version else ("gray85", "gray25"))
 
@@ -382,10 +409,10 @@ def check_shader_status(app):
                         elif val == "2": status, color = c.UI_SHADER_STATUS_VIBRANT, "red"
                         break
         except OSError: pass
-    app.lbl_shader_status.configure(text=f"Estado Shaders: {status}", text_color=color)
+    app.tools_tab.lbl_shader_status.configure(text=f"Estado Shaders: {status}", text_color=color)
 
 def launch_game(app):
-    version = app.version_var.get()
+    version = app.play_tab.version_var.get()
     if not version:
         messagebox.showwarning(c.UI_INFO_TITLE, c.UI_PLEASE_SELECT_VERSION_MSG)
         return
@@ -419,8 +446,8 @@ def launch_game(app):
     try:
         print(f"Ejecutando ({mode}): {' '.join(cmd)}")
         app.config[c.CONFIG_KEY_LAST_VERSION] = version
-        app.config[c.CONFIG_KEY_DEBUG_LOG] = app.var_debug_log.get()
-        app.config[c.CONFIG_KEY_CLOSE_ON_LAUNCH] = app.var_close_on_launch.get()
+        app.config[c.CONFIG_KEY_DEBUG_LOG] = app.play_tab.var_debug_log.get()
+        app.config[c.CONFIG_KEY_CLOSE_ON_LAUNCH] = app.play_tab.var_close_on_launch.get()
         app.config_manager.save_config()
 
         env = os.environ.copy()
@@ -431,12 +458,19 @@ def launch_game(app):
                 env["PATH"] = f"{path_additions}:{env.get('PATH', '')}"
                 env["LD_LIBRARY_PATH"] = f"{path_additions}:{env.get('LD_LIBRARY_PATH', '')}"
 
-        if app.var_debug_log.get():
+        if app.play_tab.var_debug_log.get():
             terms = ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "alacritty", "kitty", "x-terminal-emulator", "xterm"]
             selected_term = next((t for t in terms if shutil.which(t)), None)
             if selected_term:
                 bash_cmd = f"{' '.join(cmd)}; echo; read -p 'Presiona Enter para cerrar...'"
+
+                # Construir el comando base de la terminal
                 popen_args = [selected_term, "--", "bash", "-c", bash_cmd] if selected_term == "gnome-terminal" else [selected_term, "-e", f'bash -c "{bash_cmd}"']
+
+                # Si estamos en Flatpak, usar flatpak-spawn
+                if app.running_in_flatpak:
+                    popen_args = ["flatpak-spawn", "--host"] + popen_args
+
                 subprocess.Popen(popen_args)
             else:
                 messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_COMPATIBLE_TERMINAL)
@@ -444,7 +478,7 @@ def launch_game(app):
         else:
             subprocess.Popen(cmd, cwd=app.active_path, env=env)
 
-        if app.check_close_on_launch.get():
+        if app.play_tab.check_close_on_launch.get():
             app.destroy()
     except Exception as e:
         messagebox.showerror(c.UI_ERROR_TITLE, c.UI_LAUNCH_ERROR.format(e=e))
@@ -548,23 +582,33 @@ def verify_dependencies(app):
         show_flatpak_runtime_info(app)
         return
 
-    dependency_map = {
-        "APT": (["dpkg", "-s"], "apt install -y", ["libgl1", "libegl1", "libx11-6", "zenity", "pulseaudio-utils", "libcurl4", "unzip"]),
-        "DNF": (["rpm", "-q"], "dnf install -y", ["libglvnd-glx", "libglvnd-egl", "libX11", "zenity", "pulseaudio-utils", "libcurl", "unzip"]),
-        "PACMAN": (["pacman", "-Q"], "pacman -S --noconfirm --needed", ["libgl", "libegl", "libx11", "zenity", "pulseaudio", "libcurl-compat", "unzip"])
+    # --- Detección y Mapeo ---
+    manager_map = {
+        "APT": (["dpkg", "-s"], "apt install -y"),
+        "DNF": (["rpm", "-q"], "dnf install -y"),
+        "PACMAN": (["pacman", "-Q"], "pacman -S --noconfirm --needed")
     }
 
-    manager, check_cmd, install_cmd, pkg_list = (None, None, None, [])
+    detected_manager_name = None
     if shutil.which("apt"):
-        manager, (check_cmd, install_cmd, pkg_list) = "APT", dependency_map["APT"]
+        detected_manager_name = "APT"
     elif shutil.which("dnf"):
-        manager, (check_cmd, install_cmd, pkg_list) = "DNF", dependency_map["DNF"]
+        detected_manager_name = "DNF"
     elif shutil.which("pacman"):
-        manager, (check_cmd, install_cmd, pkg_list) = "PACMAN", dependency_map["PACMAN"]
+        detected_manager_name = "PACMAN"
     else:
         messagebox.showerror(c.UI_ERROR_TITLE, c.UI_PKG_MANAGER_NOT_SUPPORTED)
         return
 
+    # Usar el mapa de dependencias de constants.py
+    if detected_manager_name not in c.DEPENDENCY_MAP:
+        messagebox.showerror("Error", f"No se encontraron dependencias para '{detected_manager_name}' en la configuración.")
+        return
+
+    check_cmd, install_cmd = manager_map[detected_manager_name]
+    pkg_list = sorted(list(set(c.DEPENDENCY_MAP[detected_manager_name]))) # Limpiar y ordenar
+
+    # --- Lógica de UI (sin cambios) ---
     prog = ctk.CTkToplevel(app)
     prog.title("Verificando...")
     prog.geometry("300x120")
@@ -612,24 +656,31 @@ def verify_dependencies(app):
         d.grab_set()
 
     def run_check():
-        if app.is_flatpak:
-            try:
-                if not shutil.which("flatpak"): raise Exception("Comando 'flatpak' no encontrado.")
-                if not hasattr(app, "flatpak_list_cache") or app.flatpak_list_cache is None:
-                    app.after(0, lambda: lbl_prog.configure(text="Consultando paquetes Flatpak..."))
-                    app.flatpak_list_cache = subprocess.check_output(["flatpak", "list", "--app"], text=True)
-                res = app.flatpak_list_cache
-                flatpak_id = app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.DEFAULT_FLATPAK_ID)
-                if flatpak_id not in res:
-                    app.after(0, lambda: show_result(c.UI_FLATPAK_APP_NOT_FOUND.format(flatpak_id=flatpak_id)))
-                else:
-                    app.after(0, lambda: show_result(c.UI_DEPENDENCIES_FLATPAK_OK.format(flatpak_id=flatpak_id)))
-            except Exception as e:
-                app.after(0, lambda: show_result(c.UI_FLATPAK_VERIFICATION_ERROR.format(e=e)))
-            return
-
         app.after(0, lambda: lbl_prog.configure(text=f"Chequeando {len(pkg_list)} paquetes..."))
         missing = [pkg for pkg in pkg_list if subprocess.call(check_cmd + [pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0]
+
+        # Manejar casos de paquetes 't64' en sistemas APT
+        if detected_manager_name == "APT":
+            t64_alternatives = {
+                "libasound2": "libasound2t64",
+                "libcurl4": "libcurl4t64",
+                "libqt5core5a": "libqt5core5t64",
+                "libqt5gui5": "libqt5gui5t64",
+                "libqt5network5": "libqt5network5t64",
+                "libqt5widgets5": "libqt5widgets5t64",
+                "libssl3": "libssl3t64"
+            }
+
+            packages_to_remove = []
+            for pkg in missing:
+                if pkg in t64_alternatives:
+                    alt_pkg = t64_alternatives[pkg]
+                    if subprocess.call(check_cmd + [alt_pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+                        packages_to_remove.append(pkg)
+
+            if packages_to_remove:
+                missing = [p for p in missing if p not in packages_to_remove]
+
         if missing:
             app.after(0, lambda: show_result_missing(missing))
         else:

@@ -1,9 +1,10 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 import os
 import shutil
-import time
+import threading
 from src.utils.dialogs import ask_directory_native
+from src.gui.progress_dialog import ProgressDialog
 
 class MigrationDialog(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -14,7 +15,6 @@ class MigrationDialog(ctk.CTkToplevel):
         self.resizable(False, False)
 
         self.transient(parent)
-        self.grab_set()
 
         # ScrollableFrame principal para pantallas pequeñas
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -171,18 +171,19 @@ class MigrationDialog(ctk.CTkToplevel):
 
         # --- Acción ---
         self.btn_migrate = ctk.CTkButton(
-            self.main_scroll,
+            self,
             text="🚀 INICIAR MIGRACIÓN",
-            height=45,
+            height=40,
             fg_color="orange",
             hover_color="darkorange",
             font=ctk.CTkFont(size=15, weight="bold"),
             command=self.start_migration,
         )
-        self.btn_migrate.pack(fill="x", padx=30, pady=15)
+        self.btn_migrate.pack(pady=(10, 15), padx=30, fill="x", side="bottom")
 
         self.update_src_path_ui("Local (.local)")
         self.update_idletasks()
+        self.grab_set()
 
     def on_all_migration_toggle(self):
         """Cuando se selecciona Migrar TODO, deshabilitar otras opciones"""
@@ -276,123 +277,91 @@ class MigrationDialog(ctk.CTkToplevel):
 
     def start_migration(self):
         src = self.entry_src.get().strip()
-        dst = self.parent.compiled_path
+        dst = self.parent.active_path
         method = self.method.get()
+        migrate_all = self.check_all.get()
+        migrate_versions = self.check_versions.get()
+        migrate_worlds = self.check_worlds.get()
+        migrate_resources = self.check_resources.get()
 
-        # Validar origen
         if not os.path.exists(src):
             messagebox.showerror("Error", "La ruta de origen no existe.")
             return
-
         if src == dst:
             messagebox.showerror("Error", "Origen y destino son iguales.")
             return
-
-        # Verificar que algo esté seleccionado
-        if not (
-            self.check_all.get()
-            or self.check_versions.get()
-            or self.check_worlds.get()
-            or self.check_resources.get()
-        ):
+        if not any([migrate_all, migrate_versions, migrate_worlds, migrate_resources]):
             messagebox.showwarning("Aviso", "No seleccionaste nada para migrar.")
             return
 
-        # Confirmación
         items_to_migrate = []
-        if self.check_all.get():
+        if migrate_all:
             items_to_migrate.append("TODO (carpeta completa)")
         else:
-            if self.check_versions.get():
-                items_to_migrate.append("Versiones")
-            if self.check_worlds.get():
-                items_to_migrate.append("Mundos")
-            if self.check_resources.get():
-                items_to_migrate.append("Paquetes de Recursos")
+            if migrate_versions: items_to_migrate.append("Versiones")
+            if migrate_worlds: items_to_migrate.append("Mundos")
+            if migrate_resources: items_to_migrate.append("Paquetes de Recursos")
 
-        msg = (
-            f"¿Estás seguro de migrar datos?\\n\\n"
-            f"De: {src}\\n"
-            f"A: {dst}\\n"
-            f"Método: {method.upper()}\\n"
-            f"Elementos: {', '.join(items_to_migrate)}"
-        )
-
+        msg = (f"¿Estás seguro de migrar datos?\n\n"
+               f"De: {src}\n"
+               f"A: {dst}\n"
+               f"Método: {method.upper()}\n"
+               f"Elementos: {', '.join(items_to_migrate)}")
         if not messagebox.askyesno("Confirmar", msg):
             return
 
+        self.progress_dialog = ProgressDialog(self, "Migrando...", "Copiando archivos, por favor espera...")
+
+        thread = threading.Thread(target=self._run_migration, args=(
+            src, dst, method, migrate_all, migrate_versions, migrate_worlds, migrate_resources
+        ))
+        thread.start()
+
+    def _run_migration(self, src, dst, method, migrate_all, migrate_versions, migrate_worlds, migrate_resources):
         try:
             migrated_count = 0
+            def process_item(s_item, d_item):
+                if os.path.exists(d_item): return False
+                if method == "copy": shutil.copytree(s_item, d_item)
+                elif method == "move": shutil.move(s_item, d_item)
+                elif method == "link": os.symlink(s_item, d_item)
+                return True
 
-            if self.check_all.get():
-                # Migrar carpeta completa
-                if method == "copy":
-                    shutil.copytree(src, dst, dirs_exist_ok=True)
-                elif method == "move":
-                    shutil.move(src, dst)
-                elif method == "link":
-                    os.symlink(src, dst)
-                migrated_count = 1
-
+            if migrate_all:
+                if process_item(src, dst): migrated_count = 1
             else:
-                # Migrar elementos específicos
-                if self.check_versions.get():
-                    versions_src = os.path.join(src, "versions")
-                    versions_dst = os.path.join(dst, "versions")
-                    if os.path.exists(versions_src):
-                        os.makedirs(versions_dst, exist_ok=True)
-                        for item in os.listdir(versions_src):
-                            s_item = os.path.join(versions_src, item)
-                            d_item = os.path.join(versions_dst, item)
-                            if os.path.isdir(s_item) and not os.path.exists(d_item):
-                                if method == "copy":
-                                    shutil.copytree(s_item, d_item)
-                                elif method == "move":
-                                    shutil.move(s_item, d_item)
-                                elif method == "link":
-                                    os.symlink(s_item, d_item)
-                                migrated_count += 1
+                if migrate_versions:
+                    src_dir, dst_dir = os.path.join(src, "versions"), os.path.join(dst, "versions")
+                    if os.path.exists(src_dir):
+                        os.makedirs(dst_dir, exist_ok=True)
+                        for item in os.listdir(src_dir):
+                            if process_item(os.path.join(src_dir, item), os.path.join(dst_dir, item)): migrated_count += 1
 
-                if self.check_worlds.get():
-                    worlds_src = os.path.join(src, "games/com.mojang/minecraftWorlds")
-                    worlds_dst = os.path.join(dst, "games/com.mojang/minecraftWorlds")
-                    if os.path.exists(worlds_src):
-                        os.makedirs(worlds_dst, exist_ok=True)
-                        for item in os.listdir(worlds_src):
-                            s_item = os.path.join(worlds_src, item)
-                            d_item = os.path.join(worlds_dst, item)
-                            if os.path.isdir(s_item) and not os.path.exists(d_item):
-                                if method == "copy":
-                                    shutil.copytree(s_item, d_item)
-                                elif method == "move":
-                                    shutil.move(s_item, d_item)
-                                elif method == "link":
-                                    os.symlink(s_item, d_item)
-                                migrated_count += 1
+                if migrate_worlds:
+                    src_dir = os.path.join(src, "games/com.mojang/minecraftWorlds")
+                    dst_dir = os.path.join(dst, "games/com.mojang/minecraftWorlds")
+                    if os.path.exists(src_dir):
+                        os.makedirs(dst_dir, exist_ok=True)
+                        for item in os.listdir(src_dir):
+                            if process_item(os.path.join(src_dir, item), os.path.join(dst_dir, item)): migrated_count += 1
 
-                if self.check_resources.get():
-                    res_src = os.path.join(src, "games/com.mojang/resource_packs")
-                    res_dst = os.path.join(dst, "games/com.mojang/resource_packs")
-                    if os.path.exists(res_src):
-                        os.makedirs(res_dst, exist_ok=True)
-                        for item in os.listdir(res_src):
-                            s_item = os.path.join(res_src, item)
-                            d_item = os.path.join(res_dst, item)
-                            if os.path.isdir(s_item) and not os.path.exists(d_item):
-                                if method == "copy":
-                                    shutil.copytree(s_item, d_item)
-                                elif method == "move":
-                                    shutil.move(s_item, d_item)
-                                elif method == "link":
-                                    os.symlink(s_item, d_item)
-                                migrated_count += 1
+                if migrate_resources:
+                    src_dir = os.path.join(src, "games/com.mojang/resource_packs")
+                    dst_dir = os.path.join(dst, "games/com.mojang/resource_packs")
+                    if os.path.exists(src_dir):
+                        os.makedirs(dst_dir, exist_ok=True)
+                        for item in os.listdir(src_dir):
+                            if process_item(os.path.join(src_dir, item), os.path.join(dst_dir, item)): migrated_count += 1
 
-            messagebox.showinfo(
-                "Éxito",
-                f"Migración completada.\\nElementos procesados: {migrated_count}\\n\\nReinicia o refresca para ver cambios.",
-            )
-            self.parent.refresh_version_list()
-            self.destroy()
+            def on_complete():
+                self.progress_dialog.close()
+                messagebox.showinfo("Éxito", f"Migración completada.\nElementos procesados: {migrated_count}\n\nRefresca para ver cambios.")
+                self.parent.logic.refresh_version_list(self.parent)
+                self.destroy()
+            self.parent.after(0, on_complete)
 
         except Exception as e:
-            messagebox.showerror("Error Crítico", f"Error durante la migración:\\n{e}")
+            def on_error():
+                self.progress_dialog.close()
+                messagebox.showerror("Error Crítico", f"Error durante la migración:\n{e}")
+            self.parent.after(0, on_error)

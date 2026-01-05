@@ -209,4 +209,80 @@ inconvenientes éticos y legales.
 * **Error de Arquitectura en APK:** Si el instalador dice "Incompatible", necesitas buscar un APK que sea `x86` o `x86_64`. Los APKs estándar de la Play Store suelen ser solo ARM64.
 
 ---
+## ESTRUCTURA
+
+.
+├── scripts/
+│   ├── verify_migration.py
+│   └── verify_restore.py
+├── src/
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── app_logic.py
+│   │   └── config_manager.py
+│   ├── gui/
+│   │   ├── __init__.py
+│   │   ├── install_dialog.py
+│   │   ├── main_window.py
+│   │   ├── migration_dialog.py
+│   │   ├── progress_dialog.py
+│   │   ├── skin_pack_tool.py
+│   │   └── tabs/
+│   │       ├── __init__.py
+│   │       ├── about_tab.py
+│   │       ├── play_tab.py
+│   │       ├── settings_tab.py
+│   │       └── tools_tab.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── dialogs.py
+│   │   └── resource_path.py
+│   ├── __init__.py
+│   ├── constants.py
+│   └── main.py
+├── .gitignore
+├── cianova-launcher.sh
+├── icon.png
+├── README.md
+└── run.sh
+
+Descripción de la Estructura de Carpetas
+
+scripts/: Contiene scripts de utilidad para el desarrollo y la verificación.
+
+verify_*.py: Scripts diseñados para probar funcionalidades específicas (como la restauración de ajustes o la migración) de forma aislada, sin necesidad de interactuar con la interfaz gráfica.
+src/: Es el corazón del proyecto, donde reside todo el código fuente de la aplicación.
+
+core/: Contiene la lógica central y el manejo de datos, separado de la interfaz de usuario.
+
+app_logic.py: Maneja las operaciones principales de la aplicación (detectar versiones, lanzar el juego, verificar dependencias, etc.).
+config_manager.py: Gestiona la carga, guardado y restauración de la configuración del usuario desde el archivo cianovalauncher-config.json.
+gui/: Contiene todos los componentes relacionados con la interfaz gráfica de usuario (UI).
+
+main_window.py: Define la ventana principal de la aplicación (CianovaLauncherApp), inicializa el TabView y crea las instancias de cada pestaña.
+tabs/: Cada archivo aquí define una de las pestañas principales de la UI, encapsulando su diseño y elementos.
+play_tab.py: Define la pestaña "Jugar".
+tools_tab.py: Define la pestaña "Herramientas".
+settings_tab.py: Define la pestaña "Ajustes".
+about_tab.py: Define la pestaña "Acerca de".
+install_dialog.py, migration_dialog.py, etc.: Definen las ventanas de diálogo secundarias que se abren desde la aplicación principal.
+utils/: Almacena funciones de ayuda y utilidades que pueden ser usadas en cualquier parte del código.
+
+dialogs.py: Funciones para mostrar diálogos nativos del sistema (ej. selector de archivos).
+resource_path.py: Utilidad para encontrar la ruta correcta de los recursos, especialmente cuando la aplicación está empaquetada.
+constants.py: Un archivo crucial que centraliza todas las constantes del proyecto: textos de la UI, rutas de archivos, claves de configuración, colores, etc.
+
+main.py: Es el punto de entrada de la aplicación. Su única responsabilidad es iniciar y ejecutar la ventana principal.
+
+icon.png: Es el icono principal utilizado para la ventana de la aplicación y los accesos directos.
+
+run.sh: Script principal para ejecutar la aplicación en un entorno de desarrollo. Activa el entorno virtual e inicia main.py.
+
+cianova-launcher.sh: Script de lanzamiento pensado para la instalación final en el sistema del usuario.
+
+.gitignore: Especifica qué archivos y carpetas (como venv/ o __pycache__/) deben ser ignorados por el control de versiones Git.
+
+README.md: El archivo principal de documentación con la descripción del proyecto.
+
+---
 *Disfruta de tu experiencia en Minecraft Bedrock en Linux.*
