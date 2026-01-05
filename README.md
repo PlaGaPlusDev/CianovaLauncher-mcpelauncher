@@ -4,6 +4,10 @@ CianovaLauncher es una interfaz gráfica moderna diseñada para facilitar la ges
 
 ### 1. Ejecución
 #### Instalación para Flatpak
+
+**NOTA:** Antes de cualquier instalación por Flatpak recuerda instalarlo en el caso de que no lo tengas.
+Link para configurar Flatpak la primera vez según tu distro: [FLATPAK SETUP](https://flathub.org/en/setup)
+
 ##### Metodo 1 (Recomendado) - Actualizaciones
 
 Descarga el archivo `CianovaLauncher.flatpakrepo` en **RELEASE** o **EXTRA** para instalar y recibir actualizaciones desde tu gestor de software. (Esto descarga automáticamente las ultimas actualizaciones y runtimes necesarios).
