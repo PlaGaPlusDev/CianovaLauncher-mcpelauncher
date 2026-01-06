@@ -67,7 +67,12 @@ def process_apk(app, apk_path, ver_name, target_root=None, is_target_flatpak=Non
                 app_id = flatpak_id if flatpak_id else app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
                 cmd = ["flatpak", "run", "--command=mcpelauncher-extract", app_id, apk_path, target_dir]
                 if app.running_in_flatpak:
-                    cmd = ["flatpak-spawn", "--host"] + cmd
+                    flatpak_spawn_cmd = shutil.which("flatpak-spawn")
+                    if not flatpak_spawn_cmd:
+                        app.after(0, progress_dialog.close)
+                        app.after(0, lambda: messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario."))
+                        return
+                    cmd = [flatpak_spawn_cmd, "--host"] + cmd
             else:
                 cmd = ["mcpelauncher-extract", apk_path, target_dir]
 
@@ -433,7 +438,11 @@ def launch_game(app):
     elif "Flatpak" in mode:
         cmd = ["flatpak", "run", flatpak_id, "-dg", version_path]
         if app.running_in_flatpak:
-            cmd = ["flatpak-spawn", "--host"] + cmd
+            flatpak_spawn_cmd = shutil.which("flatpak-spawn")
+            if not flatpak_spawn_cmd:
+                messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario.")
+                return
+            cmd = [flatpak_spawn_cmd, "--host"] + cmd
     elif "Local" in mode:
         local_bin = os.path.join(os.getcwd(), "bin", "mcpelauncher-client")
         if not os.path.exists(local_bin):
@@ -473,7 +482,11 @@ def launch_game(app):
 
                 # Si estamos en Flatpak, usar flatpak-spawn
                 if app.running_in_flatpak:
-                    popen_args = ["flatpak-spawn", "--host"] + popen_args
+                    flatpak_spawn_cmd = shutil.which("flatpak-spawn")
+                    if not flatpak_spawn_cmd:
+                        messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario.")
+                        return
+                    popen_args = [flatpak_spawn_cmd, "--host"] + popen_args
 
                 subprocess.Popen(popen_args)
             else:
