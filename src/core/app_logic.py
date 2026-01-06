@@ -65,14 +65,17 @@ def process_apk(app, apk_path, ver_name, target_root=None, is_target_flatpak=Non
                 cmd = [custom_extract, apk_path, target_dir]
             elif use_flatpak_logic:
                 app_id = flatpak_id if flatpak_id else app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
-                cmd = ["flatpak", "run", "--command=mcpelauncher-extract", app_id, apk_path, target_dir]
+                base_cmd = ["flatpak", "run", "--command=mcpelauncher-extract", app_id, apk_path, target_dir]
+
                 if app.running_in_flatpak:
                     flatpak_spawn_cmd = shutil.which("flatpak-spawn")
-                    if not flatpak_spawn_cmd:
-                        app.after(0, progress_dialog.close)
-                        app.after(0, lambda: messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario."))
-                        return
-                    cmd = [flatpak_spawn_cmd, "--host"] + cmd
+                    if flatpak_spawn_cmd:
+                        cmd = [flatpak_spawn_cmd, "--host"] + base_cmd
+                    else:
+                        # Fallback a los binarios internos si flatpak-spawn no está disponible en el PATH del sandbox.
+                        cmd = ["mcpelauncher-extract", apk_path, target_dir]
+                else:
+                    cmd = base_cmd
             else:
                 cmd = ["mcpelauncher-extract", apk_path, target_dir]
 
@@ -436,13 +439,16 @@ def launch_game(app):
             return
         cmd = [client, "-dg", version_path]
     elif "Flatpak" in mode:
-        cmd = ["flatpak", "run", flatpak_id, "-dg", version_path]
+        base_cmd = ["flatpak", "run", flatpak_id, "-dg", version_path]
         if app.running_in_flatpak:
             flatpak_spawn_cmd = shutil.which("flatpak-spawn")
-            if not flatpak_spawn_cmd:
-                messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario.")
-                return
-            cmd = [flatpak_spawn_cmd, "--host"] + cmd
+            if flatpak_spawn_cmd:
+                cmd = [flatpak_spawn_cmd, "--host"] + base_cmd
+            else:
+                # Fallback a los binarios internos si flatpak-spawn no está disponible en el PATH del sandbox.
+                cmd = ["mcpelauncher-client", "-dg", version_path]
+        else:
+            cmd = base_cmd
     elif "Local" in mode:
         local_bin = os.path.join(os.getcwd(), "bin", "mcpelauncher-client")
         if not os.path.exists(local_bin):
@@ -480,13 +486,16 @@ def launch_game(app):
                 # Construir el comando base de la terminal
                 popen_args = [selected_term, "--", "bash", "-c", bash_cmd] if selected_term == "gnome-terminal" else [selected_term, "-e", f'bash -c "{bash_cmd}"']
 
-                # Si estamos en Flatpak, usar flatpak-spawn
+                # Si estamos en Flatpak, es necesario usar flatpak-spawn para lanzar una terminal en el host.
                 if app.running_in_flatpak:
                     flatpak_spawn_cmd = shutil.which("flatpak-spawn")
-                    if not flatpak_spawn_cmd:
-                        messagebox.showerror(c.UI_ERROR_TITLE, "Error: No se encontró el comando 'flatpak-spawn' necesario.")
+                    if flatpak_spawn_cmd:
+                        popen_args = [flatpak_spawn_cmd, "--host"] + popen_args
+                    else:
+                        # Si flatpak-spawn no se encuentra, no se puede lanzar una terminal en el host.
+                        # Mostramos un error claro al usuario en lugar de intentar un fallback complejo.
+                        messagebox.showerror(c.UI_ERROR_TITLE, "Error: 'flatpak-spawn' no encontrado. No se puede abrir un terminal externo.")
                         return
-                    popen_args = [flatpak_spawn_cmd, "--host"] + popen_args
 
                 subprocess.Popen(popen_args)
             else:
