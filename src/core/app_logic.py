@@ -66,6 +66,8 @@ def process_apk(app, apk_path, ver_name, target_root=None, is_target_flatpak=Non
             elif use_flatpak_logic:
                 app_id = flatpak_id if flatpak_id else app.config.get(c.CONFIG_KEY_FLATPAK_ID, c.MCPELAUNCHER_FLATPAK_ID)
                 cmd = ["flatpak", "run", "--command=mcpelauncher-extract", app_id, apk_path, target_dir]
+                if app.running_in_flatpak:
+                    cmd = ["flatpak-spawn", "--host"] + cmd
             else:
                 cmd = ["mcpelauncher-extract", apk_path, target_dir]
 
@@ -430,6 +432,8 @@ def launch_game(app):
         cmd = [client, "-dg", version_path]
     elif "Flatpak" in mode:
         cmd = ["flatpak", "run", flatpak_id, "-dg", version_path]
+        if app.running_in_flatpak:
+            cmd = ["flatpak-spawn", "--host"] + cmd
     elif "Local" in mode:
         local_bin = os.path.join(os.getcwd(), "bin", "mcpelauncher-client")
         if not os.path.exists(local_bin):

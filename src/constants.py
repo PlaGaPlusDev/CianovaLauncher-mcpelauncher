@@ -33,8 +33,8 @@ import os
 
 # --- Información de la Aplicación ---
 APP_NAME = "CianovaLauncherMCPE"
-VERSION_LAUNCHER = "2.0.0"
-CHANGELOG = "Reescritura completa: CianovaLauncherMCPE 2.0. Independencia de bases, configuración persistente."
+VERSION_LAUNCHER = "2.0b"
+CHANGELOG = "Solución de bugs: CianovaLauncherMCPE 2.0b"
 CREDITOS = "Dev: @PlaGaDev & Antigravity\nProyecto: CianovaLauncherMCPE"
 LEGAL_TEXT = """LICENCIA & TÉRMINOS Y CONDICIONES
 

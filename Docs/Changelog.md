@@ -1,5 +1,8 @@
 # 📝 Changelog - CianovaLauncher
 
+# [v2.0b] - 2026-01-05
+- **BUG FIX** flatpak-spawn
+
 # [v2.0a] - 2026-01-05
 ### CHANGES:
 - **Mejor distribución del codigo fuente** ahora esta todo el codigo fuente en la carpeta `src`
