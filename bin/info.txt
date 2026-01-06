@@ -1,5 +1,5 @@
 ==========================
-VERSION: 1.5.5 (Oficial) + COMPILED FOR @finoshaggy
+VERSION: 1.6 (Oficial) + COMPILED FOR @finoshaggy
 ==========================
 COMPILED WITH USING NINJA
 ==========================
