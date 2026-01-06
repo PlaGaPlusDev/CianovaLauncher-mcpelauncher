@@ -80,7 +80,7 @@ modules:
       - make-args: -j$(nproc)
     sources:
       - type: archive
-        path: flatlibs/libzip-1.9.2.tar.gz
+        path: flatlibs/libzip-1.7.3.tar.gz
 
   # Módulo principal del launcher con dependencias Python
   - name: cianova-launcher
