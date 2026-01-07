@@ -421,6 +421,42 @@ def check_shader_status(app):
         except OSError: pass
     app.tools_tab.lbl_shader_status.configure(text=f"Estado Shaders: {status}", text_color=color)
 
+def _launch_with_execve_fallback(app, cmd, env):
+    """
+    Muestra una notificación y luego reemplaza el proceso actual con el juego.
+    Este es el último recurso si subprocess.Popen falla.
+    """
+    dialog = ctk.CTkToplevel(app)
+    dialog.overrideredirect(True)
+    dialog.geometry("350x100")
+    dialog.configure(fg_color="#333333")
+
+    # Centrar la ventana
+    x = app.winfo_x() + (app.winfo_width() // 2) - (350 // 2)
+    y = app.winfo_y() + (app.winfo_height() // 2) - (100 // 2)
+    dialog.geometry(f"+{x}+{y}")
+
+    ctk.CTkLabel(dialog, text="Se cerrará el launcher para iniciar el juego...",
+                 font=ctk.CTkFont(size=14), wraplength=330).pack(pady=20, padx=10, fill="both", expand=True)
+
+    dialog.grab_set()
+    dialog.update()
+
+    def do_exec():
+        try:
+            # El primer argumento de execve debe ser la ruta al ejecutable.
+            # El segundo es la lista de argumentos, comenzando con el nombre del programa.
+            os.execve(cmd[0], cmd, env)
+        except Exception as e:
+            # Si execve también falla, es un problema muy grave del sistema.
+            messagebox.showerror("Error Crítico de Lanzamiento",
+                                 f"No se pudo iniciar el juego (execve falló).\nError: {e}")
+            app.destroy()
+
+    # Dar tiempo al usuario para leer el mensaje antes de que el proceso del lanzador sea reemplazado.
+    app.after(1500, do_exec)
+
+
 def launch_game(app):
     version = app.play_tab.version_var.get()
     if not version:
@@ -446,7 +482,12 @@ def launch_game(app):
                 cmd = [flatpak_spawn_cmd, "--host"] + base_cmd
             else:
                 # Fallback a los binarios internos si flatpak-spawn no está disponible en el PATH del sandbox.
-                cmd = ["mcpelauncher-client", "-dg", version_path]
+                client_path = app.config.get(c.CONFIG_KEY_BINARY_PATHS, {}).get(c.CONFIG_KEY_CLIENT)
+                if client_path and os.path.exists(client_path):
+                    cmd = [client_path, "-dg", version_path]
+                else:
+                    messagebox.showerror(c.UI_ERROR_TITLE, c.UI_CLIENT_PATH_ERROR)
+                    return
         else:
             cmd = base_cmd
     elif "Local" in mode:
@@ -477,35 +518,37 @@ def launch_game(app):
                 env["PATH"] = f"{path_additions}:{env.get('PATH', '')}"
                 env["LD_LIBRARY_PATH"] = f"{path_additions}:{env.get('LD_LIBRARY_PATH', '')}"
 
-        if app.play_tab.var_debug_log.get():
-            terms = ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "alacritty", "kitty", "x-terminal-emulator", "xterm"]
-            selected_term = next((t for t in terms if shutil.which(t)), None)
-            if selected_term:
-                bash_cmd = f"{' '.join(cmd)}; echo; read -p 'Presiona Enter para cerrar...'"
-
-                # Construir el comando base de la terminal
-                popen_args = [selected_term, "--", "bash", "-c", bash_cmd] if selected_term == "gnome-terminal" else [selected_term, "-e", f'bash -c "{bash_cmd}"']
-
-                # Si estamos en Flatpak, es necesario usar flatpak-spawn para lanzar una terminal en el host.
-                if app.running_in_flatpak:
-                    flatpak_spawn_cmd = shutil.which("flatpak-spawn")
-                    if flatpak_spawn_cmd:
-                        popen_args = [flatpak_spawn_cmd, "--host"] + popen_args
-                    else:
-                        # Si flatpak-spawn no se encuentra, no se puede lanzar una terminal en el host.
-                        # Mostramos un error claro al usuario en lugar de intentar un fallback complejo.
-                        messagebox.showerror(c.UI_ERROR_TITLE, "Error: 'flatpak-spawn' no encontrado. No se puede abrir un terminal externo.")
-                        return
-
-                subprocess.Popen(popen_args)
+        try:
+            if app.play_tab.var_debug_log.get():
+                terms = ["gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal", "tilix", "alacritty", "kitty", "x-terminal-emulator", "xterm"]
+                selected_term = next((t for t in terms if shutil.which(t)), None)
+                if selected_term:
+                    bash_cmd = f"{' '.join(cmd)}; echo; read -p 'Presiona Enter para cerrar...'"
+                    popen_args = [selected_term, "--", "bash", "-c", bash_cmd] if selected_term == "gnome-terminal" else [selected_term, "-e", f'bash -c "{bash_cmd}"']
+                    if app.running_in_flatpak:
+                        flatpak_spawn_cmd = shutil.which("flatpak-spawn")
+                        if flatpak_spawn_cmd:
+                            popen_args = [flatpak_spawn_cmd, "--host"] + popen_args
+                        else:
+                            messagebox.showerror(c.UI_ERROR_TITLE, "Error: 'flatpak-spawn' no encontrado. No se puede abrir un terminal externo.")
+                            return
+                    subprocess.Popen(popen_args)
+                else:
+                    messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_COMPATIBLE_TERMINAL)
+                    subprocess.Popen(cmd, cwd=app.active_path, env=env)
             else:
-                messagebox.showerror(c.UI_ERROR_TITLE, c.UI_NO_COMPATIBLE_TERMINAL)
                 subprocess.Popen(cmd, cwd=app.active_path, env=env)
-        else:
-            subprocess.Popen(cmd, cwd=app.active_path, env=env)
 
-        if app.play_tab.check_close_on_launch.get():
-            app.destroy()
+            if app.play_tab.check_close_on_launch.get():
+                app.destroy()
+        except OSError as e:
+            # Si Popen falla, y estamos en Flatpak, intentar el fallback final.
+            if app.running_in_flatpak:
+                print(f"Subprocess failed with OSError: {e}. Attempting execve fallback.")
+                _launch_with_execve_fallback(app, cmd, env)
+            else:
+                # Para otros sistemas, simplemente mostrar el error.
+                messagebox.showerror(c.UI_ERROR_TITLE, c.UI_LAUNCH_ERROR.format(e=e))
     except Exception as e:
         messagebox.showerror(c.UI_ERROR_TITLE, c.UI_LAUNCH_ERROR.format(e=e))
 
