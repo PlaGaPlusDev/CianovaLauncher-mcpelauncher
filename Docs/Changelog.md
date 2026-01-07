@@ -1,5 +1,8 @@
 # 📝 Changelog - CianovaLauncher
 
+# [v2.0c] - 2026-01-07
+**SUPPORT** Si no encuentra flatpak-spawn usara el cmd local para hacer un subproceso entonces se reemplazara el proceso para ejecutar el juego con exec.
+
 # [v2.0b] - 2026-01-05
 - **BUG FIX** flatpak-spawn
 
