@@ -75,13 +75,31 @@ modules:
         path: flatlibs/libevdev-1.13.1.tar.xz
 
   - name: libzip
-    buildsystem: cmake-ninja
+    buildsystem: cmake
     build-options:
-      - make-args: -j$(nproc)
+# Forzamos la variable global de CMake para el SOVERSION
+      cflags: "-DLIBZIP_SOVERSION=4"
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DLIBZIP_SOVERSION=4
+      - -DENABLE_BZIP2=OFF
+      - -DENABLE_LZMA=OFF
+      - -DBUILD_DOC=OFF
+      - -DBUILD_EXAMPLES=OFF
+      - -DBUILD_REGRESS=OFF
+      - -DBUILD_TOOLS=OFF
     sources:
       - type: archive
-        path: flatlibs/libzip-1.7.3.tar.gz
-
+        path: flatlibs/libzip-1.7.3.tar.xz
+    post-install:
+      # Si por alguna razón CMake genera libzip.so.5, creamos un enlace 
+      # simbólico para que el Launcher no falle al buscar libzip.so.4
+      - |
+        if [ ! -f /app/lib/libzip.so.4 ]; then
+          ln -s libzip.so.5 /app/lib/libzip.so.4
+        fi
+      - ls -la /app/lib/libzip.so.4
   # Módulo principal del launcher con dependencias Python
   - name: cianova-launcher
     buildsystem: simple
