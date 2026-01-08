@@ -3,10 +3,6 @@ __pycache__/
 *.log
 *.bak
 .flatpak-builder
-bin/mcpelauncher-client
-bin/mcpelauncher-extract
-bin/mcpelauncher-webview
-bin/mcpelauncher-error
 BIN-PACKS
 build
 build-dir
