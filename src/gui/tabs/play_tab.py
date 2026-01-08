@@ -70,14 +70,17 @@ class PlayTab(ctk.CTkFrame):
         self.check_close_on_launch.pack(side="left", padx=10)
 
         self.var_debug_log = ctk.BooleanVar(value=self.app.config.get(c.CONFIG_KEY_DEBUG_LOG, False))
-        self.check_debug_log = ctk.CTkCheckBox(
-            self.frame_launch_opts,
-            text=c.UI_CHECKBOX_DEBUG_LOG,
-            variable=self.var_debug_log,
-            corner_radius=15,
-            font=ctk.CTkFont(size=12),
-        )
-        self.check_debug_log.pack(side="left", padx=10)
+
+        # Ocultar la opción de log en Flatpak
+        if not self.app.running_in_flatpak:
+            self.check_debug_log = ctk.CTkCheckBox(
+                self.frame_launch_opts,
+                text=c.UI_CHECKBOX_DEBUG_LOG,
+                variable=self.var_debug_log,
+                corner_radius=15,
+                font=ctk.CTkFont(size=12),
+            )
+            self.check_debug_log.pack(side="left", padx=10)
 
         # Botón
         self.btn_launch = ctk.CTkButton(

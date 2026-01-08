@@ -135,9 +135,15 @@ class ToolsTab(ctk.CTkFrame):
         ctk.CTkLabel(
             frame_sys, text=c.UI_SECTION_SYSTEM, font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(15, 5))
+        # Botón de dependencias con texto dinámico
+        deps_text = (
+            c.UI_BUTTON_VERIFY_DEPS_FLATPAK
+            if self.app.running_in_flatpak
+            else c.UI_BUTTON_VERIFY_DEPS_LOCAL
+        )
         self.btn_verify_deps = ctk.CTkButton(
             frame_sys,
-            text=c.UI_BUTTON_VERIFY_DEPS,
+            text=deps_text,
             height=32,
             corner_radius=8,
             fg_color=c.COLOR_PURPLE_BUTTON,
@@ -145,15 +151,18 @@ class ToolsTab(ctk.CTkFrame):
             command=lambda: self.app.logic.verify_dependencies(self.app),
         )
         self.btn_verify_deps.pack(pady=5, padx=20, fill="x")
-        ctk.CTkButton(
-            frame_sys,
-            text=c.UI_BUTTON_VERIFY_HW,
-            height=32,
-            corner_radius=8,
-            fg_color=c.COLOR_PURPLE_BUTTON,
-            hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
-            command=lambda: self.app.logic.check_requirements_dialog(self.app),
-        ).pack(pady=5, padx=20, fill="x")
+
+        # Ocultar el botón de requisitos de hardware en Flatpak
+        if not self.app.running_in_flatpak:
+            ctk.CTkButton(
+                frame_sys,
+                text=c.UI_BUTTON_VERIFY_HW,
+                height=32,
+                corner_radius=8,
+                fg_color=c.COLOR_PURPLE_BUTTON,
+                hover_color=c.COLOR_PURPLE_BUTTON_HOVER,
+                command=lambda: self.app.logic.check_requirements_dialog(self.app),
+            ).pack(pady=5, padx=20, fill="x")
 
         # Panel: Acceso Directo del Menú
         frame_shortcut = ctk.CTkFrame(frame_right, corner_radius=12)

@@ -195,23 +195,44 @@ def detect_installation(app, mode_override=None):
     status_text, status_color = "", "gray"
     app.is_flatpak = False # Resetear estado
 
-    if display_mode == "Local (Propio)":
-        status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
-        app.active_path = app.our_data_path if app.running_in_flatpak else std_local_path
-    elif display_mode == "Local (Compartido)":
-        status_text, status_color = c.UI_STATUS_LOCAL_SHARED, "#27ae60"
-        app.active_path = std_local_shared
-    elif display_mode == "Local":
-        status_text, status_color = c.UI_STATUS_LOCAL, "#27ae60"
-        app.active_path = std_local_path
-    elif "Flatpak" in display_mode:
-        status_text, status_color = c.UI_STATUS_FLATPAK_CUSTOM.format(flatpak_id=flatpak_id), "#3498db"
-        app.is_flatpak = True
-        std_flatpak_path = os.path.join(app.home, f"{c.FLATPAK_DATA_DIR}/{flatpak_id}/{c.MCPELAUNCHER_DATA_SUBDIR}")
-        app.active_path = std_flatpak_path
-        app.flatpak_path = std_flatpak_path
-        if not os.path.exists(app.active_path):
-            status_text, status_color = c.UI_STATUS_FLATPAK_NO_DATA, "orange"
+    # Lógica de detección de ruta para Flatpak
+    if app.running_in_flatpak and display_mode in ["Local (Propio)", "Local (Compartido)"]:
+        own_path = app.our_data_path
+        shared_path = std_local_shared
+
+        # Prioridad: Propio > Compartido. Si no existe ninguno, default a Propio.
+        if os.path.exists(os.path.join(own_path, c.VERSIONS_DIR)):
+            app.play_tab.combo_mode.set("Local (Propio)")
+            app.active_path = own_path
+            status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
+        elif os.path.exists(os.path.join(shared_path, c.VERSIONS_DIR)):
+            app.play_tab.combo_mode.set("Local (Compartido)")
+            app.active_path = shared_path
+            status_text, status_color = c.UI_STATUS_LOCAL_SHARED, "#27ae60"
+        else:
+            # Por defecto a Propio si no se encuentra nada
+            app.play_tab.combo_mode.set("Local (Propio)")
+            app.active_path = own_path
+            status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
+    else:
+        # Lógica original para fuera de Flatpak o modo Flatpak (Personalizado)
+        if display_mode == "Local (Propio)":
+            status_text, status_color = c.UI_STATUS_LOCAL_OWN, "#27ae60"
+            app.active_path = app.our_data_path if app.running_in_flatpak else std_local_path
+        elif display_mode == "Local (Compartido)":
+            status_text, status_color = c.UI_STATUS_LOCAL_SHARED, "#27ae60"
+            app.active_path = std_local_shared
+        elif display_mode == "Local":
+            status_text, status_color = c.UI_STATUS_LOCAL, "#27ae60"
+            app.active_path = std_local_path
+        elif "Flatpak" in display_mode:
+            status_text, status_color = c.UI_STATUS_FLATPAK_CUSTOM.format(flatpak_id=flatpak_id), "#3498db"
+            app.is_flatpak = True
+            std_flatpak_path = os.path.join(app.home, f"{c.FLATPAK_DATA_DIR}/{flatpak_id}/{c.MCPELAUNCHER_DATA_SUBDIR}")
+            app.active_path = std_flatpak_path
+            app.flatpak_path = std_flatpak_path
+            if not os.path.exists(app.active_path):
+                status_text, status_color = c.UI_STATUS_FLATPAK_NO_DATA, "orange"
 
     # Si después de toda la lógica, la ruta activa no tiene versiones, mostrarlo
     if app.active_path and not os.path.exists(os.path.join(app.active_path, c.VERSIONS_DIR)):
@@ -300,9 +321,14 @@ def setup_flatpak_environment(app):
     if not app.running_in_flatpak:
         return
 
-    if os.path.exists("/app/bin/mcpelauncher-client"):
-        if app.config.get(c.CONFIG_KEY_MODE) is None or app.config.get(c.CONFIG_KEY_FIRST_RUN_FLATPAK, True):
-            app.config[c.CONFIG_KEY_MODE] = "Flatpak Empaquetado"
+    # En Flatpak, si el modo no está establecido o es la primera ejecución,
+    # el modo de binarios por defecto debería ser 'Sistema' para usar los binarios empaquetados.
+    if app.config.get(c.CONFIG_KEY_MODE) is None or app.config.get(c.CONFIG_KEY_FIRST_RUN_FLATPAK, True):
+        app.config[c.CONFIG_KEY_MODE] = "Sistema (Instalado)"
+        # A diferencia del modo "Personalizado", "Sistema" no necesita rutas explícitas
+        # ya que se asume que los binarios están en el PATH del sistema (o del sandbox).
+        # Sin embargo, los guardamos para el fallback de `execve`.
+        if os.path.exists("/app/bin/mcpelauncher-client"):
             app.config[c.CONFIG_KEY_BINARY_PATHS] = {
                 c.CONFIG_KEY_CLIENT: "/app/bin/mcpelauncher-client",
                 c.CONFIG_KEY_EXTRACT: "/app/bin/mcpelauncher-extract",
@@ -444,16 +470,26 @@ def _launch_with_execve_fallback(app, cmd, env):
 
     def do_exec():
         try:
-            # El primer argumento de execve debe ser la ruta al ejecutable.
-            # El segundo es la lista de argumentos, comenzando con el nombre del programa.
+            # Comprobación de seguridad para evitar bucle de reinicio.
+            # Compara la ruta del binario del juego con la ruta del propio lanzador.
+            game_binary_path = os.path.abspath(cmd[0])
+            launcher_script_path = os.path.abspath(app.launcher_path)
+
+            if game_binary_path == launcher_script_path:
+                messagebox.showerror(
+                    "Error de Configuración",
+                    "Se ha detectado un error crítico: El lanzador está intentando ejecutarse a sí mismo en lugar del juego.\n\n"
+                    "Por favor, revisa la configuración de los binarios en la pestaña 'Ajustes' y asegúrate de que la ruta al 'mcpelauncher-client' es correcta."
+                )
+                app.destroy()
+                return
+
             os.execve(cmd[0], cmd, env)
         except Exception as e:
-            # Si execve también falla, es un problema muy grave del sistema.
             messagebox.showerror("Error Crítico de Lanzamiento",
                                  f"No se pudo iniciar el juego (execve falló).\nError: {e}")
             app.destroy()
 
-    # Dar tiempo al usuario para leer el mensaje antes de que el proceso del lanzador sea reemplazado.
     app.after(1500, do_exec)
 
 

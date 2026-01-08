@@ -144,7 +144,14 @@ class SettingsTab(ctk.CTkFrame):
             text=c.UI_RESTART_REQUIRED_MSG,
             text_color="gray",
             font=ctk.CTkFont(size=10),
-        ).pack(pady=5)
+        ).pack()
+
+        ctk.CTkLabel(
+            frame_appearance,
+            text="Esto solo cambia ligeramente la IU, no la cambia radicalmente.",
+            text_color="gray",
+            font=ctk.CTkFont(size=10),
+        ).pack(pady=(0, 10))
 
         # Inicializar estado visual
         self.on_settings_mode_change(self.combo_settings_mode.get())
