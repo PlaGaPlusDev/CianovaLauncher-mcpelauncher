@@ -19,7 +19,7 @@ from src.gui.tabs.settings_tab import SettingsTab
 from src.gui.tabs.about_tab import AboutTab
 
 class CianovaLauncherApp(ctk.CTk):
-    def __init__(self, force_flatpak_ui=False):
+    def __init__(self, launcher_path=".", force_flatpak_ui=False):
         super().__init__()
 
         # Lógica de la aplicación
@@ -28,6 +28,7 @@ class CianovaLauncherApp(ctk.CTk):
         # ==========================================
         # 1. RUTAS Y DETECCIÓN (MOVIDO AL INICIO)
         # ==========================================
+        self.launcher_path = launcher_path
         self.home = c.HOME_DIR
         self.force_flatpak_ui = force_flatpak_ui
 
@@ -231,22 +232,11 @@ class CianovaLauncherApp(ctk.CTk):
 
         # Detección inicial
         target_exists = os.path.exists(main_desktop_file)
-        if not target_exists and self.running_in_flatpak:
-            try:
-                res = subprocess.run(
-                    [
-                        "flatpak-spawn",
-                        "--host",
-                        "ls",
-                        os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
-                    ],
-                    capture_output=True,
-                    timeout=1,
-                )
-                if res.returncode == 0:
-                    target_exists = True
-            except:
-                pass
+        if self.running_in_flatpak:
+            # En Flatpak, el .desktop se crea en una ruta diferente.
+            flatpak_desktop_name = f"{self.our_flatpak_id}.desktop"
+            flatpak_desktop_path = os.path.join(c.HOME_DIR, ".local/share/flatpak/exports/share/applications/", flatpak_desktop_name)
+            target_exists = os.path.exists(flatpak_desktop_path)
 
         status_color = "green" if target_exists else "orange"
         status_text = c.UI_SHORTCUT_ACTIVE_MSG if target_exists else c.UI_SHORTCUT_INACTIVE_MSG
@@ -258,44 +248,23 @@ class CianovaLauncherApp(ctk.CTk):
         ).pack()
 
         def toggle_main():
-            # Volver a verificar para el comando
-            exists_now = os.path.exists(main_desktop_file)
-            if not exists_now and self.running_in_flatpak:
-                try:
-                    res = subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "ls",
-                            os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
-                        ],
-                        capture_output=True,
-                        timeout=1,
-                    )
-                    if res.returncode == 0:
-                        exists_now = True
-                except:
-                    pass
+            # La lógica de creación/borrado ahora debe ser consciente del entorno
+            is_flatpak = self.running_in_flatpak
+
+            # Determinar la ruta correcta del archivo .desktop
+            if is_flatpak:
+                flatpak_desktop_name = f"{self.our_flatpak_id}.desktop"
+                shortcut_path = os.path.join(c.HOME_DIR, ".local/share/flatpak/exports/share/applications/", flatpak_desktop_name)
+            else:
+                shortcut_path = main_desktop_file
+
+            exists_now = os.path.exists(shortcut_path)
 
             if exists_now:
-                if messagebox.askyesno(
-                    "Confirmar", c.UI_CONFIRM_DELETE_SHORTCUT_MSG
-                ):
+                if messagebox.askyesno("Confirmar", c.UI_CONFIRM_DELETE_SHORTCUT_MSG):
                     try:
-                        if self.running_in_flatpak:
-                            subprocess.run(
-                                [
-                                    "flatpak-spawn",
-                                    "--host",
-                                    "rm",
-                                    os.path.join(c.HOME_DIR, c.APPLICATIONS_DIR, c.DESKTOP_SHORTCUT_NAME)
-                                ]
-                            )
-                        else:
-                            os.remove(main_desktop_file)
-                        messagebox.showinfo(
-                            c.UI_SUCCESS_TITLE, c.UI_SHORTCUT_DELETED_MSG
-                        )
+                        os.remove(shortcut_path)
+                        messagebox.showinfo(c.UI_SUCCESS_TITLE, c.UI_SHORTCUT_DELETED_MSG)
                         dialog.destroy()
                         self.manage_desktop_shortcut()
                     except Exception as e:
@@ -344,6 +313,15 @@ Terminal=false
 Type=Application
 Categories=Game;
 """
+            # En Flatpak, el archivo .desktop principal se gestiona de forma diferente
+            if self.running_in_flatpak and not version:
+                messagebox.showinfo(
+                    "Información",
+                    "El acceso directo principal de la aplicación Flatpak se crea automáticamente al instalar.\n\n"
+                    "Puedes gestionarlo desde tu tienda de aplicaciones (ej. Discover, GNOME Software)."
+                )
+                return
+
             target = os.path.join(desktop_folder, f"{filename}.desktop")
             try:
                 os.makedirs(os.path.dirname(target), exist_ok=True)
