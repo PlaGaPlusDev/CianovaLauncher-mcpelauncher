@@ -3,25 +3,34 @@
 # ==========================================
 DEPENDENCY_MAP = {
     "APT": [
+        # Librerías base del sistema (sin cambios)
         "libcurl4", "libssl3", "libx11-6", "libxext6", "libxi6",
         "libxrandr2", "libxcursor1", "libxfixes3", "libxrender1",
         "libasound2", "libpulse0", "libsystemd0", "libgl1", "libegl1",
-        "libqt5core5a", "libqt5gui5", "libqt5widgets5", "libqt5network5",
-        "libqt5webengine5", "libqt5qml5", "libqt5quick5", "libqt5svg5",
-        "zenity", "unzip"
+        "zenity", "unzip",
+        # Librerías Qt6
+        "libqt6core6", "libqt6gui6", "libqt6widgets6", "libqt6network6",
+        "libqt6webengine6", "libqt6qml6", "libqt6quick6", "libqt6svg6",
+        "qml6-module-qtquick-controls" # Importante para la UI en QML
     ],
     "DNF": [
+        # Librerías base del sistema (sin cambios)
         "libcurl", "openssl-libs", "libX11", "libXext", "libXi",
         "libXrandr", "libXcursor", "libXfixes", "libXrender", "alsa-lib",
         "pulseaudio-libs", "systemd-libs", "mesa-libGL", "mesa-libEGL",
-        "qt5-qtbase", "qt5-qtwebengine", "qt5-qtdeclarative", "qt5-qtsvg",
-        "qt5-qtquickcontrols2", "zenity", "unzip"
+        "zenity", "unzip",
+        # Librerías Qt6
+        "qt6-qtbase", "qt6-qtbase-gui", "qt6-qtwebengine", 
+        "qt6-qtdeclarative", "qt6-qtsvg"
     ],
     "PACMAN": [
+        # Librerías base del sistema (sin cambios)
         "curl", "openssl", "libx11", "libxext", "libxi", "libxrandr",
         "libxcursor", "libxfixes", "libxrender", "alsa-lib", "pulseaudio",
-        "systemd-libs", "mesa", "qt5-base", "qt5-webengine",
-        "qt5-declarative", "qt5-svg", "qt5-quickcontrols2", "zenity", "unzip"
+        "systemd-libs", "mesa", "zenity", "unzip",
+        # Librerías Qt6
+        "qt6-base", "qt6-webengine", "qt6-declarative", 
+        "qt6-svg", "qt6-5compat" # Útil si usas módulos legacy
     ]
 }
 
@@ -33,12 +42,12 @@ import os
 
 # --- Información de la Aplicación ---
 APP_NAME = "CianovaLauncherMCPE"
-VERSION_LAUNCHER = "2.0c"
-CHANGELOG = "Solución de bugs: CianovaLauncherMCPE 2.0c"
-CREDITOS = "Dev: @PlaGaDev & Antigravity\nProyecto: CianovaLauncherMCPE"
+VERSION_LAUNCHER = "2.1"
+CHANGELOG = "Solución de bugs: CianovaLauncherMCPE 2.1"
+CREDITOS = "Dev: @PlaGaDev, @ShaggyLinux & Antigravity\nProyecto: CianovaLauncher"
 LEGAL_TEXT = """LICENCIA & TÉRMINOS Y CONDICIONES
 
-Última Actualización: 26 de Diciembre de 2025
+Última Actualización de T&C: 26 de Diciembre de 2025
 
 ---
 
@@ -269,11 +278,11 @@ por el entorno de ejecución (runtime).
 Asegúrate de tener instalados los runtimes necesarios.
 
 Para Usuarios:
-- org.kde.Platform//5.15-23.08
-- io.qt.qtwebengine.BaseApp//5.15-23.08
+- org.kde.Platform//6.8
+- io.qt.qtwebengine.BaseApp//6.8
 
 Para Desarrolladores:
-- org.kde.Sdk//5.15-23.08
+- org.kde.Sdk//6.8
 """
 UI_DEPENDENCY_CHECK_ERROR = "No se encontró '{list_file}'"
 UI_PKG_MANAGER_NOT_SUPPORTED = "Gestor de paquetes no soportado."

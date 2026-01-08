@@ -1,13 +1,13 @@
 app-id: org.cianova.Launcher
 runtime: org.kde.Platform
-runtime-version: "5.15-23.08"
+runtime-version: "6.8"
 sdk: org.kde.Sdk
 base: io.qt.qtwebengine.BaseApp
-base-version: "5.15-23.08"
+base-version: "6.8"
 command: cianova-launcher.sh
 
 metadata:
-  x-flatpak-version: "2.0c"
+  x-flatpak-version: "2.1"
 
 build-options:
   strip: false
@@ -26,8 +26,7 @@ finish-args:
   - --metadata=X-DCONF=true
   - --env=XDG_CURRENT_DESKTOP=KDE
   # Variables de entorno para forzar modo oscuro en la aplicación
-  - --env=QT_QPA_PLATFORMTHEME=kde
-  - --env=QT_STYLE_OVERRIDE=kvantum
+  - --env=QT_QPA_PLATFORMTHEME=xdgdesktopportal
   - --env=COLOR_SCHEME=dark
 
   # Acceso a GPU para OpenGL
@@ -63,7 +62,7 @@ finish-args:
 
   # Variables de entorno necesarias
   - --env=PATH=/app/bin:/usr/bin
-  - --env=LD_LIBRARY_PATH=/app/lib
+  - --env=LD_LIBRARY_PATH=/app/lib/x86_64-linux-gnu:/app/lib:/app/share/mcpelauncher/lib
 
 # Permitir acceso a red durante el build para pip
 
@@ -82,6 +81,7 @@ modules:
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DBUILD_SHARED_LIBS=ON
+      - -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu #Forzar a la nueva ruta lmao
       - -DLIBZIP_SOVERSION=4
       - -DENABLE_BZIP2=OFF
       - -DENABLE_LZMA=OFF
@@ -96,10 +96,13 @@ modules:
       # Si por alguna razón CMake genera libzip.so.5, creamos un enlace 
       # simbólico para que el Launcher no falle al buscar libzip.so.4
       - |
-        if [ ! -f /app/lib/libzip.so.4 ]; then
-          ln -s libzip.so.5 /app/lib/libzip.so.4
+        LIB_DIR=/app/lib/x86_64-linux-gnu
+        if [ ! -f $LIB_DIR/libzip.so.4 ]; then
+          # Si existe la 5, creamos el enlace a la 4 en la carpeta correcta
+          if [ -f $LIB_DIR/libzip.so.5 ]; then
+             ln -s $LIB_DIR/libzip.so.5 $LIB_DIR/libzip.so.4
+          fi
         fi
-      - ls -la /app/lib/libzip.so.4
   # Módulo principal del launcher con dependencias Python
   - name: cianova-launcher
     buildsystem: simple
