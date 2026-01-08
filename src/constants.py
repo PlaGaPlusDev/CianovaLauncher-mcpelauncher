@@ -10,7 +10,7 @@ DEPENDENCY_MAP = {
         "zenity", "unzip",
         # Librerías Qt6
         "libqt6core6", "libqt6gui6", "libqt6widgets6", "libqt6network6",
-        "libqt6webengine6", "libqt6qml6", "libqt6quick6", "libqt6svg6",
+        "libqt6webenginewidgets6", "libqt6qml6", "libqt6quick6", "libqt6svg6",
         "qml6-module-qtquick-controls" # Importante para la UI en QML
     ],
     "DNF": [
