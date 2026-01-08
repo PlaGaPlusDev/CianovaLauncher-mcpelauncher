@@ -1,5 +1,8 @@
 # 📝 Changelog - CianovaLauncher
 
+# [v2.1] - 2026-XX-XX
+**SWITCH QT6:** Ahora el launcher pasara sus dependencias y librerias a uso de Qt6 mas especifico la versión 6.8
+
 # [v2.0c] - 2026-01-07
 **SUPPORT** Si no encuentra flatpak-spawn usara el cmd local para hacer un subproceso entonces se reemplazara el proceso para ejecutar el juego con exec.
 

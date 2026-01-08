@@ -1,6 +1,6 @@
 # ⚖️ LICENCIA & TÉRMINOS Y CONDICIONES
 
-**Última Actualización:** 26 de Diciembre de 2025
+**Última Actualización de T&C:** 26 de Diciembre de 2025
 
 ---
 

@@ -7,6 +7,7 @@ CianovaLauncher es una interfaz gráfica moderna diseñada para facilitar la ges
 
 **NOTA:** Antes de cualquier instalación por Flatpak recuerda instalarlo en el caso de que no lo tengas.
 Link para configurar Flatpak la primera vez según tu distro: [FLATPAK SETUP](https://flathub.org/en/setup)
+
 **NOTA 2** Si tu distro es muy estricto con permisos y no tiene `flatpak-spawn` va a hacer un subproceso local o reemplazar el proceso del launcher (Solo usara los binarios disponibles en el Flatpak. Si no es muy estricto tipo Ubuntu, Mint, Debian, Arch, ZorinOS funcionara completamente.)
 
 ##### Metodo 1 (Recomendado) - Actualizaciones
@@ -27,7 +28,7 @@ flatpak install --user CianovaLauncher org.cianova.Launcher
 Esto hará que se instale el launcher con sus runtimes necesarios, pero puedes instalarlos manualmente con:
 
 ```bash
-flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
+flatpak install org.kde.Platform//6.8 io.qt.qtwebengine.BaseApp//6.8
 ```
 ##### Metodo 2 - Bundle
 
@@ -40,7 +41,7 @@ flatpak install --user CianovaLauncher.flatpak
 
 Eh instala los runtimes necesarios con:
 ```bash
-flatpak install org.kde.Platform//5.15-23.08 io.qt.qtwebengine.BaseApp//5.15-23.08
+flatpak install org.kde.Platform//6.8 io.qt.qtwebengine.BaseApp//6.8
 ```
 
 #### Instalación no-Flatpak:
