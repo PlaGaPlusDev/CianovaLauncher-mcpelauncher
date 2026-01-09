@@ -1,4 +1,5 @@
 # CianovaLauncher v2.0
+## Nota: Está es la rama de la versión Qt6
 
 CianovaLauncher es una interfaz gráfica moderna diseñada para facilitar la gestión, instalación y personalización de Minecraft: Bedrock Edition en Linux. Esta herramienta trabaja en conjunto con la base del proyecto **MCPELauncher-manifest**, proporcionando una experiencia de usuario amigable y potente.
 
