@@ -15,7 +15,6 @@ class SkinPackTool(ctk.CTkToplevel):
         self.geometry("700x550")
 
         self.transient(parent)
-        self.grab_set()
 
         self.skins = []
 
@@ -45,6 +44,8 @@ class SkinPackTool(ctk.CTkToplevel):
             command=self.export_pack,
             fg_color="green",
         ).pack(side="right", padx=5)
+
+        self.grab_set()
 
     def add_skins_multi(self):
         file_paths = ask_open_filenames_native(self, filetypes=[("Imágenes PNG", "*.png")])
